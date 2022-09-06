@@ -36,7 +36,7 @@ func analyzeFile(filename string) {
 	defer sourceFile.Close()
 
 	out := new(strings.Builder)
-	analyzer.Do(sourceFile, out)
+	analyzer.Compile(sourceFile, out)
 	writeToFile(filename, out.String())
 }
 
