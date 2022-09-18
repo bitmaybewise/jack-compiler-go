@@ -36,7 +36,10 @@ func analyzeFile(filename string) {
 	defer sourceFile.Close()
 
 	out := new(strings.Builder)
-	analyzer.Compile(sourceFile, out)
+	err := analyzer.Compile(sourceFile, out)
+	if err != nil {
+		panicsOnError(err)
+	}
 	writeToFile(filename, out.String())
 }
 
@@ -65,7 +68,7 @@ func dirFilenames(dirname string) []string {
 }
 
 func writeToFile(filename string, content string) {
-	outputFilename := strings.Replace(filename, ".jack", "T2.xml", 1)
+	outputFilename := strings.Replace(filename, ".jack", "2.xml", 1)
 	fmt.Printf("output:\t%s\n", outputFilename)
 
 	err := os.WriteFile(outputFilename, []byte(content), 0666)

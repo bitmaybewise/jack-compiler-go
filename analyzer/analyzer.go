@@ -1,36 +1,31 @@
 package analyzer
 
 import (
-	"encoding/xml"
-	"errors"
-	"io"
 	"os"
 	"strings"
 
+	"github.com/hlmerscher/jack-compiler-go/engine"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
+	"github.com/hlmerscher/jack-compiler-go/writer"
 )
 
-type tokensWrapper struct {
-	XMLName xml.Name `xml:"tokens"`
-	Tokens  []tokenizer.Token
-}
-
-func Compile(file *os.File, out *strings.Builder) {
+func Compile(file *os.File, out *strings.Builder) error {
 	tk := tokenizer.New(file)
 
-	tw := tokensWrapper{Tokens: make([]tokenizer.Token, 0)}
-	for {
-		token, err := tk.Advance()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		tw.Tokens = append(tw.Tokens, token)
-	}
-
-	result, err := xml.MarshalIndent(tw, "", " ")
+	_, err := tk.Advance()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	out.Write(result)
+
+	compiled, err := engine.CompileClass(&tk)
+	if err != nil {
+		return err
+	}
+
+	err = writer.Output(out, compiled)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

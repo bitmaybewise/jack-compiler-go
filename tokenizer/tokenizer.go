@@ -19,12 +19,16 @@ var (
 )
 
 func New(input io.Reader) Tokenizer {
-	return Tokenizer{input: bufio.NewReader(input)}
+	return Tokenizer{
+		input:   bufio.NewReader(input),
+		Current: EmptyToken,
+	}
 }
 
 type Tokenizer struct {
 	input       *bufio.Reader
 	currentLine string
+	Current     Token
 }
 
 func (tk *Tokenizer) HasMoreTokens() bool {
@@ -39,6 +43,9 @@ func (tk *Tokenizer) Advance() (Token, error) {
 	currentLine, err := tk.ReadLine()
 	if errors.Is(err, Ignored) {
 		return tk.Advance()
+	}
+	if errors.Is(err, io.EOF) {
+		return tk.Current, nil
 	}
 	if err != nil {
 		return EmptyToken, err
@@ -74,10 +81,12 @@ func (tk *Tokenizer) nextToken() Token {
 	}
 	tk.currentLine = strings.Trim(line[currentIndex:], " ")
 
-	return Token{
+	tk.Current = Token{
 		Raw:  rawToken.String(),
 		Type: parseTokenType(rawToken.String()),
 	}
+
+	return tk.Current
 }
 
 func (tk *Tokenizer) ReadLine() (string, error) {
