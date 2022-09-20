@@ -228,11 +228,89 @@ func CompileSubroutineBody(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		nestedToken.append(varToken)
 	}
 
+	statementsToken, err := CompileStatements(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(statementsToken)
+
 	closeToken, err := processToken(tk, is("}"))
 	if err != nil {
 		return nil, err
 	}
 	nestedToken.append(closeToken)
+
+	return nestedToken, nil
+}
+
+func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "statements"})
+
+	for {
+		if _, ok := is("let")(tk.Current); ok {
+			letToken, err := CompileLet(tk)
+			if err != nil {
+				return nil, err
+			}
+			nestedToken.append(letToken)
+			continue
+		}
+		break
+	}
+
+	return nestedToken, nil
+}
+
+func CompileLet(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "letStatement"})
+
+	letToken, err := processToken(tk, is("let"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(letToken)
+
+	termToken, err := CompileTerm(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(termToken)
+
+	// TODO: [ expression ]
+
+	assignmentToken, err := processToken(tk, is("="))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(assignmentToken)
+
+	expToken, err := CompileExpression(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(expToken)
+
+	semicolonToken, err := processToken(tk, is(";"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(semicolonToken)
+
+	return nestedToken, nil
+}
+
+func CompileExpression(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "expression"})
+	termNestedToken := makeNestedToken(&tokenizer.Token{Raw: "term"})
+	nestedToken.append(termNestedToken)
+
+	termToken, err := CompileTerm(tk)
+	if err != nil {
+		return nil, err
+	}
+	termNestedToken.append(termToken)
+
+	// TODO: (op term)*
 
 	return nestedToken, nil
 }
