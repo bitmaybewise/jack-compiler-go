@@ -62,11 +62,11 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		nestedToken.append(varDecToken)
 	}
 
-	// subRoutineToken, err := CompileSubroutine(tk)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// nestedToken.append(subRoutineToken)
+	subRoutineToken, err := CompileSubroutine(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(subRoutineToken)
 
 	closeToken, err := processToken(tk, is("}"))
 	if err != nil {
@@ -100,7 +100,7 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "classDecVar"})
 	nestedToken.append(classVarDecToken)
 
-	typeToken, err := processToken(tk, is("boolean"), is("int"), is("char"), isClass())
+	typeToken, err := processToken(tk, isType())
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +129,56 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	return nestedToken, nil
 }
 
-func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
-	return nil, fmt.Errorf("not implemented error")
+func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	subRoutineDecToken, err := processToken(tk, is("constructor"), is("function"), is("method"))
+	if err != nil {
+		return nil, err
+	}
+
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "subroutineDec"})
+	nestedToken.append(subRoutineDecToken)
+
+	subRoutineTypeToken, err := processToken(tk, is("void"), isType())
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(subRoutineTypeToken)
+
+	subRoutineNameToken, err := CompileTerm(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(subRoutineNameToken)
+
+	openParamToken, err := processToken(tk, is("("))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openParamToken)
+
+	// parameter list
+
+	closeParamToken, err := processToken(tk, is(")"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeParamToken)
+
+	// sub routine body
+
+	openToken, err := processToken(tk, is("{"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openToken)
+
+	closeToken, err := processToken(tk, is("}"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeToken)
+
+	return nestedToken, nil
 }
 
 type tokenMatcher func(tokenizer.Token) (string, bool)
@@ -145,6 +193,18 @@ func isClass() tokenMatcher {
 	return func(t tokenizer.Token) (string, bool) {
 		_, ok := classNames[t.Raw]
 		return t.Raw, ok
+	}
+}
+
+func isType() tokenMatcher {
+	return func(t tokenizer.Token) (string, bool) {
+		matchers := []tokenMatcher{is("boolean"), is("int"), is("char"), isClass()}
+		for _, match := range matchers {
+			if token, ok := match(t); ok {
+				return token, ok
+			}
+		}
+		return t.Raw, false
 	}
 }
 
