@@ -129,6 +129,44 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	return nestedToken, nil
 }
 
+func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "varDec"})
+
+	varDecToken, err := processToken(tk, is("var"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(varDecToken)
+
+	typeToken, err := processToken(tk, isType())
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(typeToken)
+
+	for {
+		termToken, err := CompileTerm(tk)
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(termToken)
+
+		colonToken, err := processToken(tk, is(","))
+		if err != nil {
+			break
+		}
+		nestedToken.append(colonToken)
+	}
+
+	semicolonToken, err := processToken(tk, is(";"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(semicolonToken)
+
+	return nestedToken, nil
+}
+
 func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	subRoutineDecToken, err := processToken(tk, is("constructor"), is("function"), is("method"))
 	if err != nil {
@@ -164,13 +202,31 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(closeParamToken)
 
-	// sub routine body
+	bodyToken, err := CompileSubroutineBody(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(bodyToken)
+
+	return nestedToken, nil
+}
+
+func CompileSubroutineBody(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "subroutineBody"})
 
 	openToken, err := processToken(tk, is("{"))
 	if err != nil {
 		return nil, err
 	}
 	nestedToken.append(openToken)
+
+	for {
+		varToken, err := CompileVarDec(tk)
+		if err != nil {
+			break
+		}
+		nestedToken.append(varToken)
+	}
 
 	closeToken, err := processToken(tk, is("}"))
 	if err != nil {
