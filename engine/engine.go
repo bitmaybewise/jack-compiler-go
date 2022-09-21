@@ -194,7 +194,7 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(openParamToken)
 
-	// parameter list
+	// TODO: parameter list
 
 	closeParamToken, err := processToken(tk, is(")"))
 	if err != nil {
@@ -248,11 +248,20 @@ func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 
 	for {
 		if _, ok := is("let")(tk.Current); ok {
-			letToken, err := CompileLet(tk)
+			token, err := CompileLet(tk)
 			if err != nil {
 				return nil, err
 			}
-			nestedToken.append(letToken)
+			nestedToken.append(token)
+			continue
+		}
+
+		if _, ok := is("if")(tk.Current); ok {
+			token, err := CompileIf(tk)
+			if err != nil {
+				return nil, err
+			}
+			nestedToken.append(token)
 			continue
 		}
 		break
@@ -295,6 +304,83 @@ func CompileLet(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		return nil, err
 	}
 	nestedToken.append(semicolonToken)
+
+	return nestedToken, nil
+}
+
+func CompileIf(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "ifStatement"})
+
+	ifToken, err := processToken(tk, is("if"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(ifToken)
+
+	openToken, err := processToken(tk, is("("))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openToken)
+
+	expToken, err := CompileExpression(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(expToken)
+
+	closeToken, err := processToken(tk, is(")"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeToken)
+
+	openStatementToken, err := processToken(tk, is("{"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openStatementToken)
+
+	statementToken, err := CompileStatements(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(statementToken)
+
+	closeStatementToken, err := processToken(tk, is("}"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeStatementToken)
+
+	_, hasElse := is("else")(tk.Current)
+	if !hasElse {
+		return nestedToken, nil
+	}
+
+	elseToken, err := processToken(tk, is("else"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(elseToken)
+
+	openElseStatementToken, err := processToken(tk, is("{"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openElseStatementToken)
+
+	elseStatementToken, err := CompileStatements(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(elseStatementToken)
+
+	closeElseStatementToken, err := processToken(tk, is("}"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeElseStatementToken)
 
 	return nestedToken, nil
 }
