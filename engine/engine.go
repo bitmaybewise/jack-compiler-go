@@ -10,6 +10,7 @@ import (
 
 var (
 	notClassVarDec = errors.New("not a class variable declaration")
+	notSubroutine  = errors.New("not a subroutine declaration")
 )
 
 type NestedToken struct {
@@ -62,16 +63,22 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		nestedToken.append(varDecToken)
 	}
 
-	subRoutineToken, err := CompileSubroutine(tk)
-	if err != nil {
-		return nil, err
+	for {
+		subRoutineToken, err := CompileSubroutine(tk)
+		if errors.Is(err, notSubroutine) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(subRoutineToken)
 	}
-	nestedToken.append(subRoutineToken)
 
 	closeToken, err := processToken(tk, is("}"))
 	if err != nil {
 		return nil, err
 	}
+
 	nestedToken.append(closeToken)
 
 	return nestedToken, nil
@@ -92,12 +99,18 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 }
 
 func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
-	classVarDecToken, err := processToken(tk, is("static"), is("field"))
-	if err != nil {
-		return nil, fmt.Errorf("%w (%s)", notClassVarDec, err)
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "classDecVar"})
+
+	matcher := or(is("static"), is("field"))
+	if _, ok := matcher(tk.Current); !ok {
+		return nil, notClassVarDec
 	}
 
-	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "classDecVar"})
+	classVarDecToken, err := processToken(tk, matcher)
+	if err != nil {
+		return nil, err
+	}
+
 	nestedToken.append(classVarDecToken)
 
 	typeToken, err := processToken(tk, isType())
@@ -168,12 +181,17 @@ func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 }
 
 func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
-	subRoutineDecToken, err := processToken(tk, is("constructor"), is("function"), is("method"))
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "subroutineDec"})
+
+	matcher := or(is("constructor"), is("function"), is("method"))
+	if _, ok := matcher(tk.Current); !ok {
+		return nil, notSubroutine
+	}
+
+	subRoutineDecToken, err := processToken(tk, matcher)
 	if err != nil {
 		return nil, err
 	}
-
-	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "subroutineDec"})
 	nestedToken.append(subRoutineDecToken)
 
 	subRoutineTypeToken, err := processToken(tk, is("void"), isType())
@@ -234,6 +252,12 @@ func CompileSubroutineBody(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(statementsToken)
 
+	returnToken, err := CompileReturn(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(returnToken)
+
 	closeToken, err := processToken(tk, is("}"))
 	if err != nil {
 		return nil, err
@@ -266,6 +290,26 @@ func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		}
 		break
 	}
+
+	return nestedToken, nil
+}
+
+func CompileReturn(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "returnStatement"})
+
+	returnToken, err := processToken(tk, is("return"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(returnToken)
+
+	// TODO: expression?
+
+	semicolonToken, err := processToken(tk, is(";"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(semicolonToken)
 
 	return nestedToken, nil
 }
@@ -417,8 +461,11 @@ func isClass() tokenMatcher {
 }
 
 func isType() tokenMatcher {
+	return or(is("boolean"), is("int"), is("char"))
+}
+
+func or(matchers ...tokenMatcher) tokenMatcher {
 	return func(t tokenizer.Token) (string, bool) {
-		matchers := []tokenMatcher{is("boolean"), is("int"), is("char"), isClass()}
 		for _, match := range matchers {
 			if token, ok := match(t); ok {
 				return token, ok
