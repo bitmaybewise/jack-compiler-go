@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
 )
@@ -85,9 +86,12 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 }
 
 func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
-	if tk.Current.Type != tokenizer.IDENTIFIER {
+	matcher := regexp.MustCompile(`^[a-z_A-Z]{1}[a-zA-Z_0-9]*$`)
+
+	if tk.Current.Type != tokenizer.IDENTIFIER || !matcher.Match([]byte(tk.Current.Raw)) {
 		return nil, fmt.Errorf("wrong identifier error, value %s, type <%s>", tk.Current.Raw, tk.Current.Type)
 	}
+
 	token := tk.Current
 
 	_, err := tk.Advance()
