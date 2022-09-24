@@ -87,7 +87,7 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 }
 
 func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
-	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "classDecVar"})
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "classVarDec"})
 
 	matcher := or(is("static"), is("field"))
 	if _, ok := matcher(tk.Current); !ok {
@@ -276,6 +276,14 @@ func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 			nestedToken.append(token)
 			continue
 		}
+		if _, ok := is("do")(tk.Current); ok {
+			token, err := CompileDo(tk)
+			if err != nil {
+				return nil, err
+			}
+			nestedToken.append(token)
+			continue
+		}
 		break
 	}
 
@@ -415,6 +423,66 @@ func CompileIf(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken.append(closeElseStatementToken)
 
 	return nestedToken, nil
+}
+
+func CompileDo(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "doStatement"})
+
+	doToken, err := processToken(tk, is("do"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(doToken)
+
+	// callToken, err := CompileSubroutineCall(tk)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// nestedToken.append(callToken)
+
+	varClassNameToken, err := processToken(tk, isIdentifier())
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(varClassNameToken)
+
+	dotToken, err := processToken(tk, is("."))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(dotToken)
+
+	subroutineNameToken, err := processToken(tk, isIdentifier())
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(subroutineNameToken)
+
+	openToken, err := processToken(tk, is("("))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openToken)
+
+	// TODO: expression list
+
+	closeToken, err := processToken(tk, is(")"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeToken)
+
+	semicolonToken, err := processToken(tk, is(";"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(semicolonToken)
+
+	return nestedToken, nil
+}
+
+func CompileSubroutineCall(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	panic("unimplemented")
 }
 
 func CompileExpression(tk *tokenizer.Tokenizer) (*NestedToken, error) {
