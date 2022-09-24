@@ -30,8 +30,6 @@ func makeNestedToken(token *tokenizer.Token) *NestedToken {
 	return &NestedToken{XMLName: xml.Name{Local: token.Raw}}
 }
 
-var classNames = map[string]struct{}{}
-
 func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	classToken, err := processToken(tk, is("class"))
 	if err != nil {
@@ -40,12 +38,11 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(classToken)
 	nestedToken.append(classToken)
 
-	termToken, err := CompileTerm(tk)
+	classNameToken, err := processToken(tk, isIdentifier())
 	if err != nil {
 		return nil, err
 	}
-	nestedToken.append(termToken)
-	classNames[termToken.Raw] = struct{}{}
+	nestedToken.append(classNameToken)
 
 	openToken, err := processToken(tk, is("{"))
 	if err != nil {
@@ -86,20 +83,7 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 }
 
 func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
-	matcher := regexp.MustCompile(`^[a-z_A-Z]{1}[a-zA-Z_0-9]*$`)
-
-	if tk.Current.Type != tokenizer.IDENTIFIER || !matcher.Match([]byte(tk.Current.Raw)) {
-		return nil, fmt.Errorf("wrong identifier error, value %s, type <%s>", tk.Current.Raw, tk.Current.Type)
-	}
-
-	token := tk.Current
-
-	_, err := tk.Advance()
-	if err != nil {
-		return nil, err
-	}
-
-	return &token, nil
+	return processToken(tk, isTerm())
 }
 
 func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
@@ -124,11 +108,11 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken.append(typeToken)
 
 	for {
-		termToken, err := CompileTerm(tk)
+		varNameToken, err := processToken(tk, isIdentifier())
 		if err != nil {
 			return nil, err
 		}
-		nestedToken.append(termToken)
+		nestedToken.append(varNameToken)
 
 		colonToken, err := processToken(tk, is(","))
 		if err != nil {
@@ -162,11 +146,11 @@ func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken.append(typeToken)
 
 	for {
-		termToken, err := CompileTerm(tk)
+		varNameToken, err := processToken(tk, isIdentifier())
 		if err != nil {
 			return nil, err
 		}
-		nestedToken.append(termToken)
+		nestedToken.append(varNameToken)
 
 		colonToken, err := processToken(tk, is(","))
 		if err != nil {
@@ -204,7 +188,7 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(subRoutineTypeToken)
 
-	subRoutineNameToken, err := CompileTerm(tk)
+	subRoutineNameToken, err := processToken(tk, isIdentifier())
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +311,7 @@ func CompileLet(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(letToken)
 
-	termToken, err := CompileTerm(tk)
+	termToken, err := processToken(tk, isIdentifier())
 	if err != nil {
 		return nil, err
 	}
@@ -457,15 +441,36 @@ func is(tokenTerm string) tokenMatcher {
 	}
 }
 
-func isClass() tokenMatcher {
-	return func(t tokenizer.Token) (string, bool) {
-		_, ok := classNames[t.Raw]
-		return t.Raw, ok
+func isType() tokenMatcher {
+	return or(is("boolean"), is("int"), is("char"), isIdentifier())
+}
+
+func isIdentifier() tokenMatcher {
+	return func(token tokenizer.Token) (string, bool) {
+		matcher := regexp.MustCompile(`^[a-z_A-Z]{1}[a-zA-Z_0-9]*$`)
+		itIs := token.Type == tokenizer.IDENTIFIER &&
+			matcher.Match([]byte(token.Raw))
+
+		return token.Raw, itIs
 	}
 }
 
-func isType() tokenMatcher {
-	return or(is("boolean"), is("int"), is("char"))
+func isTerm() tokenMatcher {
+	return func(token tokenizer.Token) (string, bool) {
+		_, isId := isIdentifier()(token)
+
+		itIs := token.Type == tokenizer.INT_CONST ||
+			token.Type == tokenizer.STRING_CONST ||
+			token.Type == tokenizer.KEYWORD ||
+			isId
+			// TODO: varName
+			// TODO: varName[expression]
+			// TODO: (expression)
+			// TODO: (unaryOp term)
+			// TODO: subroutineCall
+
+		return token.Raw, itIs
+	}
 }
 
 func or(matchers ...tokenMatcher) tokenMatcher {
