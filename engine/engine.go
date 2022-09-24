@@ -114,11 +114,11 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		}
 		nestedToken.append(varNameToken)
 
-		colonToken, err := processToken(tk, is(","))
+		commaToken, err := processToken(tk, is(","))
 		if err != nil {
 			break
 		}
-		nestedToken.append(colonToken)
+		nestedToken.append(commaToken)
 	}
 
 	semicolonToken, err := processToken(tk, is(";"))
@@ -152,11 +152,11 @@ func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		}
 		nestedToken.append(varNameToken)
 
-		colonToken, err := processToken(tk, is(","))
+		commaToken, err := processToken(tk, is(","))
 		if err != nil {
 			break
 		}
-		nestedToken.append(colonToken)
+		nestedToken.append(commaToken)
 	}
 
 	semicolonToken, err := processToken(tk, is(";"))
@@ -224,7 +224,29 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 func CompileParameterList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "parameterList"})
 
-	// TODO
+	for {
+		if _, ok := isType()(tk.Current); !ok {
+			break
+		}
+
+		typeToken, err := processToken(tk, isType())
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(typeToken)
+
+		varNameToken, err := processToken(tk, isIdentifier())
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(varNameToken)
+
+		commaToken, err := processToken(tk, is(","))
+		if err != nil {
+			break
+		}
+		nestedToken.append(commaToken)
+	}
 
 	return nestedToken, nil
 }
@@ -316,7 +338,13 @@ func CompileReturn(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(returnToken)
 
-	// TODO: expression?
+	expToken, err := CompileExpression(tk)
+	if err != nil {
+		return nil, err
+	}
+	if len(expToken.Children) > 0 {
+		nestedToken.append(expToken)
+	}
 
 	semicolonToken, err := processToken(tk, is(";"))
 	if err != nil {
@@ -451,29 +479,25 @@ func CompileDo(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(doToken)
 
-	// callToken, err := CompileSubroutineCall(tk)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// nestedToken.append(callToken)
-
 	varClassNameToken, err := processToken(tk, isIdentifier())
 	if err != nil {
 		return nil, err
 	}
 	nestedToken.append(varClassNameToken)
 
-	dotToken, err := processToken(tk, is("."))
-	if err != nil {
-		return nil, err
-	}
-	nestedToken.append(dotToken)
+	if _, ok := is(".")(tk.Current); ok {
+		dotToken, err := processToken(tk, is("."))
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(dotToken)
 
-	subroutineNameToken, err := processToken(tk, isIdentifier())
-	if err != nil {
-		return nil, err
+		subroutineNameToken, err := processToken(tk, isIdentifier())
+		if err != nil {
+			return nil, err
+		}
+		nestedToken.append(subroutineNameToken)
 	}
-	nestedToken.append(subroutineNameToken)
 
 	openToken, err := processToken(tk, is("("))
 	if err != nil {
@@ -505,27 +529,41 @@ func CompileDo(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 func CompileExpressionList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "expressionList"})
 
-	// TODO
+	for {
+		expToken, err := CompileExpression(tk)
+		if err != nil {
+			return nil, err
+		}
+		if len(expToken.Children) == 0 {
+			break
+		}
+		nestedToken.append(expToken)
+
+		commaToken, err := processToken(tk, is(","))
+		if err != nil {
+			break
+		}
+		nestedToken.append(commaToken)
+	}
 
 	return nestedToken, nil
 }
 
-func CompileSubroutineCall(tk *tokenizer.Tokenizer) (*NestedToken, error) {
-	panic("unimplemented")
-}
-
 func CompileExpression(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "expression"})
-	termNestedToken := makeNestedToken(&tokenizer.Token{Raw: "term"})
-	nestedToken.append(termNestedToken)
 
-	termToken, err := CompileTerm(tk)
-	if err != nil {
-		return nil, err
+	if _, ok := isTerm()(tk.Current); ok {
+		termNestedToken := makeNestedToken(&tokenizer.Token{Raw: "term"})
+		nestedToken.append(termNestedToken)
+
+		termToken, err := CompileTerm(tk)
+		if err != nil {
+			return nil, err
+		}
+		termNestedToken.append(termToken)
+
+		// TODO: (op term)*
 	}
-	termNestedToken.append(termToken)
-
-	// TODO: (op term)*
 
 	return nestedToken, nil
 }
