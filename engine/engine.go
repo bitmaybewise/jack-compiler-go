@@ -305,6 +305,15 @@ func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 			continue
 		}
 
+		if _, ok := is("while")(tk.Current); ok {
+			token, err := CompileWhile(tk)
+			if err != nil {
+				return nil, err
+			}
+			nestedToken.append(token)
+			continue
+		}
+
 		if _, ok := is("do")(tk.Current); ok {
 			token, err := CompileDo(tk)
 			if err != nil {
@@ -325,6 +334,56 @@ func CompileStatements(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 
 		break
 	}
+
+	return nestedToken, nil
+}
+
+func CompileWhile(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "whileStatement"})
+
+	returnToken, err := processToken(tk, is("while"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(returnToken)
+
+	openToken, err := processToken(tk, is("("))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openToken)
+
+	expToken, err := CompileExpression(tk)
+	if err != nil {
+		return nil, err
+	}
+	if len(expToken.Children) > 0 {
+		nestedToken.append(expToken)
+	}
+
+	closeToken, err := processToken(tk, is(")"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeToken)
+
+	openStatementToken, err := processToken(tk, is("{"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(openStatementToken)
+
+	statementToken, err := CompileStatements(tk)
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(statementToken)
+
+	closeStatementToken, err := processToken(tk, is("}"))
+	if err != nil {
+		return nil, err
+	}
+	nestedToken.append(closeStatementToken)
 
 	return nestedToken, nil
 }
