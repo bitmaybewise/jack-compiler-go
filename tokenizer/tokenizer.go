@@ -26,9 +26,11 @@ func New(input io.Reader) Tokenizer {
 }
 
 type Tokenizer struct {
-	input       *bufio.Reader
-	currentLine string
-	Current     Token
+	input         *bufio.Reader
+	CurrentLine   string
+	tokenizedLine string
+	LineNr        int
+	Current       Token
 }
 
 func (tk *Tokenizer) HasMoreTokens() bool {
@@ -36,11 +38,13 @@ func (tk *Tokenizer) HasMoreTokens() bool {
 }
 
 func (tk *Tokenizer) Advance() (Token, error) {
-	if len(tk.currentLine) > 0 {
+	if len(tk.tokenizedLine) > 0 {
 		return tk.nextToken(), nil
 	}
 
-	currentLine, err := tk.ReadLine()
+	tokenizedLine, err := tk.ReadLine()
+	tk.LineNr++
+	tk.CurrentLine = tokenizedLine
 	if errors.Is(err, Ignored) {
 		return tk.Advance()
 	}
@@ -50,13 +54,13 @@ func (tk *Tokenizer) Advance() (Token, error) {
 	if err != nil {
 		return EmptyToken, err
 	}
-	tk.currentLine = currentLine
+	tk.tokenizedLine = tokenizedLine
 
 	return tk.Advance()
 }
 
 func (tk *Tokenizer) nextToken() Token {
-	line := strings.Trim(tk.currentLine, " ")
+	line := strings.Trim(tk.tokenizedLine, " ")
 	if line == "" {
 		return EmptyToken
 	}
@@ -64,9 +68,9 @@ func (tk *Tokenizer) nextToken() Token {
 	var rawToken strings.Builder
 
 	var currentIndex int
-	for i, char := range tk.currentLine {
+	for i, char := range tk.tokenizedLine {
 		currentIndex = i
-		if char == ' ' && tk.currentLine[0] != '"' {
+		if char == ' ' && tk.tokenizedLine[0] != '"' {
 			break
 		}
 		if isSymbol(string(char)) && rawToken.Len() > 0 {
@@ -79,7 +83,7 @@ func (tk *Tokenizer) nextToken() Token {
 		}
 		rawToken.WriteRune(char)
 	}
-	tk.currentLine = strings.Trim(line[currentIndex:], " ")
+	tk.tokenizedLine = strings.Trim(line[currentIndex:], " ")
 
 	tk.Current = Token{
 		Raw:  rawToken.String(),

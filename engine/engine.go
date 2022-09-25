@@ -691,7 +691,10 @@ func processToken(tk *tokenizer.Tokenizer, matchers ...tokenMatcher) (*tokenizer
 	}
 
 	if expToken == "" {
-		return nil, fmt.Errorf("wrong token error, expected %q, got %q", tokenNames, tk.Current.Raw)
+		return nil, fmt.Errorf(
+			"wrong token error on line %d\n%q\nexpected %q, got %q",
+			tk.LineNr, tk.CurrentLine, tokenNames, tk.Current.Raw,
+		)
 	}
 
 	token := tk.Current
