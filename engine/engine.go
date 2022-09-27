@@ -707,6 +707,7 @@ func CompileDo(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	nestedToken.append(closeToken)
 
 	semicolonToken, err := processToken(tk, is(";"))
@@ -721,11 +722,11 @@ func CompileDo(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 func CompileExpressionList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "expressionList"})
 
-	for {
-		if _, ok := isTerm()(tk.Current); !ok {
-			break
-		}
+	if _, ok := is(")")(tk.Current); ok {
+		return nestedToken, nil
+	}
 
+	for {
 		expToken, err := CompileExpression(tk)
 		if err != nil {
 			return nil, err
@@ -735,9 +736,12 @@ func CompileExpressionList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		}
 		nestedToken.append(expToken)
 
+		if _, ok := is(",")(tk.Current); !ok {
+			break
+		}
 		commaToken, err := processToken(tk, is(","))
 		if err != nil {
-			break
+			return nil, err
 		}
 		nestedToken.append(commaToken)
 	}
