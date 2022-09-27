@@ -43,7 +43,6 @@ func (tk *Tokenizer) Advance() (Token, error) {
 	}
 
 	tokenizedLine, err := tk.ReadLine()
-	tk.LineNr++
 	tk.CurrentLine = tokenizedLine
 	if errors.Is(err, Ignored) {
 		return tk.Advance()
@@ -98,6 +97,7 @@ func (tk *Tokenizer) ReadLine() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	tk.LineNr++
 
 	if isSingleLineComment(line) {
 		return "", Ignored
@@ -108,6 +108,7 @@ func (tk *Tokenizer) ReadLine() (string, error) {
 			if err != nil {
 				return "", err
 			}
+			tk.LineNr++
 
 			if isEndOfMultiLineComment(line) {
 				return "", Ignored
