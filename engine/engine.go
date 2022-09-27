@@ -85,7 +85,8 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 func CompileTerm(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "term"})
 
-	unaryOp := func() (*NestedToken, error) {
+	// unaryOp term
+	if _, ok := isUnaryOp()(tk.Current); ok {
 		opToken, err := processToken(tk, isUnaryOp())
 		if err != nil {
 			return nil, err
@@ -109,15 +110,11 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		}
 		nestedToken.append(openToken)
 
-		if _, ok := isUnaryOp()(tk.Current); ok {
-			unaryOp()
-		} else {
-			expToken, err := CompileExpression(tk)
-			if err != nil {
-				return nil, err
-			}
-			nestedToken.append(expToken)
+		expToken, err := CompileExpression(tk)
+		if err != nil {
+			return nil, err
 		}
+		nestedToken.append(expToken)
 
 		closeToken, err := processToken(tk, is(")"))
 		if err != nil {
@@ -156,11 +153,6 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		nestedToken.append(closeArrayToken)
 
 		return nestedToken, nil
-	}
-
-	// unaryOp term
-	if _, ok := isUnaryOp()(tk.Current); ok {
-		return unaryOp()
 	}
 
 	// subroutineCall
@@ -756,14 +748,11 @@ func CompileExpression(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 		return nestedToken, nil
 	}
 
-	termNestedToken := makeNestedToken(&tokenizer.Token{Raw: "term"})
-	nestedToken.append(termNestedToken)
-
 	termToken, err := CompileTerm(tk)
 	if err != nil {
 		return nil, err
 	}
-	termNestedToken.append(termToken)
+	nestedToken.append(termToken)
 
 	for {
 		if _, ok := isOp()(tk.Current); !ok {

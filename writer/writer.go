@@ -2,7 +2,6 @@ package writer
 
 import (
 	"encoding/xml"
-	"fmt"
 	"strings"
 )
 
@@ -12,8 +11,6 @@ func Output(out *strings.Builder, value any) error {
 		return err
 	}
 
-	fmt.Printf("%s\n", result)
 	out.Write(result)
-
 	return nil
 }
