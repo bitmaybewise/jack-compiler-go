@@ -68,7 +68,7 @@ func dirFilenames(dirname string) []string {
 }
 
 func writeToFile(filename string, content string) {
-	outputFilename := strings.Replace(filename, ".jack", "2.xml", 1)
+	outputFilename := strings.Replace(filename, ".jack", ".vm", 1)
 	fmt.Printf("output:\t%s\n", outputFilename)
 
 	err := os.WriteFile(outputFilename, []byte(content), 0666)
