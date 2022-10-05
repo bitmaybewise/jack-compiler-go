@@ -30,6 +30,17 @@ func makeNestedToken(token *tokenizer.Token) *NestedToken {
 	return &NestedToken{XMLName: xml.Name{Local: token.Raw}}
 }
 
+type symbol struct {
+	_type string
+	_kind string
+	index int
+}
+
+var (
+	classSymbolTable      = map[string]symbol{}
+	subroutineSymbolTable = map[string]symbol{}
+)
+
 func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	classToken, err := processToken(tk, is("class"))
 	if err != nil {
@@ -50,6 +61,7 @@ func CompileClass(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(openToken)
 
+	classSymbolTable = make(map[string]symbol)
 	for {
 		varDecToken, err := CompileClassVarDec(tk)
 		if errors.Is(err, notClassVarDec) {
@@ -128,6 +140,9 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	// varName
 	termToken, err := processToken(tk, isTerm())
 	if err != nil {
+		return nil, err
+	}
+	if err = enforceVarDec(tk, termToken); err != nil {
 		return nil, err
 	}
 	nestedToken.append(termToken)
@@ -214,12 +229,17 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(typeToken)
 
-	for {
+	for i := 0; ; i++ {
 		varNameToken, err := processToken(tk, isIdentifier())
 		if err != nil {
 			return nil, err
 		}
 		nestedToken.append(varNameToken)
+		classSymbolTable[varNameToken.Raw] = symbol{
+			_type: typeToken.Raw,
+			_kind: classVarDecToken.Raw,
+			index: i,
+		}
 
 		commaToken, err := processToken(tk, is(","))
 		if err != nil {
@@ -252,12 +272,17 @@ func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	}
 	nestedToken.append(typeToken)
 
-	for {
+	for i := 0; ; i++ {
 		varNameToken, err := processToken(tk, isIdentifier())
 		if err != nil {
 			return nil, err
 		}
 		nestedToken.append(varNameToken)
+		subroutineSymbolTable[varNameToken.Raw] = symbol{
+			_type: typeToken.Raw,
+			_kind: "var",
+			index: i,
+		}
 
 		commaToken, err := processToken(tk, is(","))
 		if err != nil {
@@ -276,6 +301,8 @@ func CompileVarDec(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 }
 
 func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
+	subroutineSymbolTable = make(map[string]symbol)
+
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "subroutineDec"})
 
 	matcher := or(is("constructor"), is("function"), is("method"))
@@ -331,7 +358,7 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 func CompileParameterList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken := makeNestedToken(&tokenizer.Token{Raw: "parameterList"})
 
-	for {
+	for i := 0; ; i++ {
 		if _, ok := isType()(tk.Current); !ok {
 			break
 		}
@@ -347,6 +374,11 @@ func CompileParameterList(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 			return nil, err
 		}
 		nestedToken.append(varNameToken)
+		subroutineSymbolTable[varNameToken.Raw] = symbol{
+			_type: typeToken.Raw,
+			_kind: "arg",
+			index: i,
+		}
 
 		commaToken, err := processToken(tk, is(","))
 		if err != nil {
@@ -534,6 +566,9 @@ func CompileLet(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = enforceVarDec(tk, termToken); err != nil {
+		return nil, err
+	}
 	nestedToken.append(termToken)
 
 	if _, ok := is("[")(tk.Current); ok {
@@ -575,6 +610,18 @@ func CompileLet(tk *tokenizer.Tokenizer) (*NestedToken, error) {
 	nestedToken.append(semicolonToken)
 
 	return nestedToken, nil
+}
+
+func enforceVarDec(tk *tokenizer.Tokenizer, termToken *tokenizer.Token) error {
+	_, inSubroutineDec := subroutineSymbolTable[termToken.Raw]
+	_, inClassDec := classSymbolTable[termToken.Raw]
+	found := inSubroutineDec || inClassDec
+
+	if termToken.Type == tokenizer.IDENTIFIER && !found {
+		return fmt.Errorf("line %d: %q\nvariable %q not declared", tk.LineNr, tk.CurrentLine, termToken.Raw)
+	}
+
+	return nil
 }
 
 func CompileIf(tk *tokenizer.Tokenizer) (*NestedToken, error) {
