@@ -255,3 +255,30 @@ func isString(value string) bool {
 func isIdentifier(value string) bool {
 	return regexp.MustCompile(`^\D[a-zA-Z0-9_]*`).Match([]byte(value))
 }
+
+type NestedToken struct {
+	Raw      string
+	Type     string
+	Kind     string
+	Parent   *NestedToken
+	children []any
+}
+
+func (nt *NestedToken) Append(token any) []any {
+	if token != nil {
+		nt.children = append(nt.children, token)
+	}
+	return nt.children
+}
+
+func (nt *NestedToken) Children() []any {
+	return nt.children
+}
+
+func MakeNestedToken(token *Token) *NestedToken {
+	return &NestedToken{
+		Raw:  token.Raw,
+		Type: string(token.Type),
+		Kind: token.Raw,
+	}
+}

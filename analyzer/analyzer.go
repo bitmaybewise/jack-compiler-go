@@ -17,17 +17,12 @@ func Compile(file *os.File, out *strings.Builder) error {
 		return err
 	}
 
-	writer := vm.NewWriter(out)
-
-	_, err = engine.CompileClass(&tk)
+	compiled, err := engine.CompileClass(&tk)
 	if err != nil {
 		return err
 	}
 
-	_, err = writer.Output()
-	if err != nil {
-		return err
-	}
+	vm.Output(compiled, out)
 
 	return nil
 }
