@@ -257,28 +257,26 @@ func isIdentifier(value string) bool {
 }
 
 type NestedToken struct {
-	Raw      string
+	Token    Token
 	Type     string
 	Kind     string
 	Parent   *NestedToken
-	children []any
+	children []*NestedToken
 }
 
-func (nt *NestedToken) Append(token any) []any {
-	if token != nil {
-		nt.children = append(nt.children, token)
+func (nt *NestedToken) Append(token *NestedToken) {
+	if token == nil {
+		return
 	}
-	return nt.children
+
+	nt.children = append(nt.children, token)
+	token.Parent = nt
 }
 
-func (nt *NestedToken) Children() []any {
+func (nt *NestedToken) Children() []*NestedToken {
 	return nt.children
 }
 
 func MakeNestedToken(token *Token) *NestedToken {
-	return &NestedToken{
-		Raw:  token.Raw,
-		Type: string(token.Type),
-		Kind: token.Raw,
-	}
+	return &NestedToken{Token: *token, Kind: token.Raw}
 }
