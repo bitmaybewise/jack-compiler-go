@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
@@ -33,36 +34,39 @@ func PrintAST(compiled *tokenizer.NestedToken) {
 	fn(compiled, 1)
 }
 
-func translate(utoken any, out *strings.Builder) {
+func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 	// fmt.Printf("%+v\n", token)
-
-	token, ok := utoken.(*tokenizer.NestedToken)
-	if !ok {
-		fmt.Printf("WARNING: ignoring unknown token %T%+v\n", token, token)
-	}
 
 	if token.Kind == "function" {
 		function(token, out)
 	}
 	if token.Kind == "subroutineCall" {
 		subroutineCall(token, out)
+		if token.Parent.Parent.Kind == "do" {
+			pop("temp", 0, out)
+		}
 	}
 	if token.Kind == "return" {
 		returnCall(token, out)
 	}
+	if token.Kind == "var" {
+		n, _ := strconv.Atoi(token.Token.Raw)
+		pop("local", n, out)
+	}
 	if token.Token.Type == tokenizer.INT_CONST {
-		push(token, out)
+		push("constant", token.Token.Raw, out)
 	}
 	if token.Token.Type == tokenizer.SYMBOL {
 		symbol(token, out)
 	}
+
 	for _, child := range token.Children() {
 		translate(child, out)
 	}
 }
 
-func push(token *tokenizer.NestedToken, out *strings.Builder) {
-	cmd := fmt.Sprintf("push constant %s\n", token.Token.Raw)
+func push(dest string, value any, out *strings.Builder) {
+	cmd := fmt.Sprintf("push %s %s\n", dest, value)
 	out.WriteString(cmd)
 }
 
@@ -100,14 +104,12 @@ func function(token *tokenizer.NestedToken, out *strings.Builder) {
 func subroutineCall(token *tokenizer.NestedToken, out *strings.Builder) {
 	cmd := fmt.Sprintf("call %s %d\n", token.Token.Raw, len(token.Parent.Children())-1)
 	out.WriteString(cmd)
-	pop("temp", 0, out)
 }
 
 func returnCall(token *tokenizer.NestedToken, out *strings.Builder) {
 	subroutineType := token.Parent.Parent.Parent.Kind
-
 	if subroutineType == "void" {
-		out.WriteString("push constant 0\n")
+		push("constant", 0, out)
 	}
 	out.WriteString("return\n")
 }
