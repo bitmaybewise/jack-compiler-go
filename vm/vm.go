@@ -51,7 +51,23 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 	}
 	if token.Kind == "var" {
 		n, _ := strconv.Atoi(token.Token.Raw)
-		pop("local", n, out)
+		push("local", n, out)
+	}
+	if token.Kind == "arg" && token.Parent.Kind == "let" {
+		n, _ := strconv.Atoi(token.Token.Raw)
+		pop("argument", n, out)
+	} else if token.Kind == "arg" {
+		n, _ := strconv.Atoi(token.Token.Raw)
+		push("argument", n, out)
+	}
+	if token.Kind == "while" {
+		expression, statements := token.Children()[0], token.Children()[1]
+		while(
+			token,
+			func() { translate(expression, out) },
+			func() { translate(statements, out) },
+			out,
+		)
 	}
 	if token.Token.Type == tokenizer.INT_CONST {
 		push("constant", token.Token.Raw, out)
@@ -66,7 +82,7 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 }
 
 func push(dest string, value any, out *strings.Builder) {
-	cmd := fmt.Sprintf("push %s %s\n", dest, value)
+	cmd := fmt.Sprintf("push %s %v\n", dest, value)
 	out.WriteString(cmd)
 }
 
@@ -79,11 +95,14 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 	op := map[string]string{
 		"+": "add",
 		"-": "sub",
+		">": "gt",
+		"<": "lt",
 		"*": "call Math.multiply 2",
 		"/": "call Math.divide 2",
 	}
 	unaryOp := map[string]string{
 		"-": "neg",
+		"~": "not",
 	}
 	if val, ok := unaryOp[token.Token.Raw]; token.Kind == "unary" && ok {
 		out.WriteString(val + "\n")
@@ -97,7 +116,8 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 }
 
 func function(token *tokenizer.NestedToken, out *strings.Builder) {
-	cmd := fmt.Sprintf("function %s.%s 0\n", token.Parent.Token.Raw, token.Token.Raw)
+	var nVars int
+	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Token.Raw, token.Token.Raw, nVars)
 	out.WriteString(cmd)
 }
 
@@ -112,4 +132,23 @@ func returnCall(token *tokenizer.NestedToken, out *strings.Builder) {
 		push("constant", 0, out)
 	}
 	out.WriteString("return\n")
+}
+
+var whileCounter = 0
+
+func while(token *tokenizer.NestedToken, expressionFn, statementsFn func(), out *strings.Builder) {
+	t := fmt.Sprintf("WHILE_EXP_%d", whileCounter)
+	f := fmt.Sprintf("WHILE_END_%d", whileCounter)
+	labelT := fmt.Sprintf("label %s\n", t)
+	labelF := fmt.Sprintf("label %s\n", f)
+
+	out.WriteString(labelT)
+	expressionFn() // compiled expression
+	out.WriteString("not\n")
+	out.WriteString(fmt.Sprintf("if-goto %s\n", f))
+	statementsFn() // compiled statements
+	out.WriteString(fmt.Sprintf("goto %s\n", t))
+	out.WriteString(labelF)
+
+	whileCounter++
 }
