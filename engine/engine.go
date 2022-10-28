@@ -628,13 +628,14 @@ func enforceVarDec(tk *tokenizer.Tokenizer, termToken *tokenizer.NestedToken) (*
 }
 
 func CompileIf(tk *tokenizer.Tokenizer) (*tokenizer.NestedToken, error) {
-	nestedToken := tokenizer.MakeNestedToken(&tokenizer.Token{Raw: "ifStatement"})
+	// nestedToken := tokenizer.MakeNestedToken(&tokenizer.Token{Raw: "ifStatement"})
 
 	ifToken, err := processToken(tk, is("if"))
 	if err != nil {
 		return nil, err
 	}
-	nestedToken.Append(ifToken)
+	nestedToken := ifToken
+	// nestedToken.Append(ifToken)
 
 	_, err = processToken(tk, is("("))
 	if err != nil {

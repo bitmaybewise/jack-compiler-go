@@ -37,6 +37,9 @@ func PrintAST(compiled *tokenizer.NestedToken) {
 func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 	// fmt.Printf("%+v\n", token)
 
+	if token == nil {
+		return
+	}
 	if token.Kind == "function" {
 		function(token, out)
 	}
@@ -47,7 +50,11 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 		}
 	}
 	if token.Kind == "return" {
+		for _, expression := range token.Children() {
+			translate(expression, out)
+		}
 		returnCall(token, out)
+		return
 	}
 	if token.Kind == "var" {
 		n, _ := strconv.Atoi(token.Token.Raw)
@@ -61,13 +68,29 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 		push("argument", n, out)
 	}
 	if token.Kind == "while" {
-		expression, statements := token.Children()[0], token.Children()[1]
+		children := token.Children()
+		expression, statements := children[0], children[1]
 		while(
 			token,
 			func() { translate(expression, out) },
 			func() { translate(statements, out) },
 			out,
 		)
+		return
+	}
+	if token.Kind == "if" {
+		children := token.Children()
+		exp := children[0]
+		translate(exp, out)
+		trueStatements := children[1]
+		falseStatements := children[3]
+		ifStatement(
+			token,
+			func() { translate(trueStatements, out) },
+			func() { translate(falseStatements, out) },
+			out,
+		)
+		return
 	}
 	if token.Token.Type == tokenizer.INT_CONST {
 		push("constant", token.Token.Raw, out)
@@ -95,6 +118,7 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 	op := map[string]string{
 		"+": "add",
 		"-": "sub",
+		"=": "eq",
 		">": "gt",
 		"<": "lt",
 		"*": "call Math.multiply 2",
@@ -151,4 +175,23 @@ func while(token *tokenizer.NestedToken, expressionFn, statementsFn func(), out 
 	out.WriteString(labelF)
 
 	whileCounter++
+}
+
+var ifCounter = 0
+
+func ifStatement(token *tokenizer.NestedToken, ifFn, elseFn func(), out *strings.Builder) {
+	ifFalse := fmt.Sprintf("IF_%d", ifCounter)
+	ifEnd := fmt.Sprintf("IF_END_%d", ifCounter)
+	labelFalse := fmt.Sprintf("label %s\n", ifFalse)
+	labelEnd := fmt.Sprintf("label %s\n", ifEnd)
+
+	out.WriteString("not\n")
+	out.WriteString(fmt.Sprintf("if-goto %s\n", ifFalse))
+	ifFn() // compiled statments
+	out.WriteString(fmt.Sprintf("goto %s\n", ifEnd))
+	out.WriteString(labelFalse)
+	elseFn() // compiled statements
+	out.WriteString(labelEnd)
+
+	ifCounter++
 }
