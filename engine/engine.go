@@ -274,17 +274,19 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*tokenizer.NestedToken, error)
 func CompileVarDec(tk *tokenizer.Tokenizer) (*tokenizer.NestedToken, error) {
 	nestedToken := tokenizer.MakeNestedToken(&tokenizer.Token{Raw: "varDec"})
 
-	varDecToken, err := processToken(tk, is("var"))
+	// varDecToken, err := processToken(tk, is("var"))
+	_, err := processToken(tk, is("var"))
 	if err != nil {
 		return nil, err
 	}
-	nestedToken.Append(varDecToken)
+	// varDecToken.Kind = "varDec"
+	// nestedToken.Append(varDecToken)
 
 	typeToken, err := processToken(tk, isType())
 	if err != nil {
 		return nil, err
 	}
-	nestedToken.Append(typeToken)
+	// nestedToken.Append(typeToken)
 
 	for i := 0; ; i++ {
 		varNameToken, err := processToken(tk, isIdentifier())
@@ -406,11 +408,11 @@ func CompileSubroutineBody(tk *tokenizer.Tokenizer) (*tokenizer.NestedToken, err
 	}
 
 	for {
-		_, err := CompileVarDec(tk)
+		varToken, err := CompileVarDec(tk)
 		if err != nil {
 			break
 		}
-		// nestedToken.Append(varToken)
+		nestedToken.Append(varToken)
 	}
 
 	statementsToken, err := CompileStatements(tk)

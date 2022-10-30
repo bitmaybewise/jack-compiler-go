@@ -59,6 +59,7 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 	if token.Kind == "var" {
 		n, _ := strconv.Atoi(token.Token.Raw)
 		push("local", n, out)
+		// pop("local", n, out)
 	}
 	if token.Kind == "arg" && token.Parent.Kind == "let" {
 		n, _ := strconv.Atoi(token.Token.Raw)
@@ -98,6 +99,9 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 	if token.Token.Type == tokenizer.SYMBOL {
 		symbol(token, out)
 	}
+	if token.Token.Type == tokenizer.KEYWORD {
+		keyword(token, out)
+	}
 
 	for _, child := range token.Children() {
 		translate(child, out)
@@ -121,6 +125,7 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 		"=": "eq",
 		">": "gt",
 		"<": "lt",
+		"&": "and",
 		"*": "call Math.multiply 2",
 		"/": "call Math.divide 2",
 	}
@@ -139,8 +144,22 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 	fmt.Printf("WARNING: ignoring symbol %q\n", token.Token)
 }
 
+func keyword(token *tokenizer.NestedToken, out *strings.Builder) {
+	if token.Token.Type == tokenizer.KEYWORD && token.Token.Raw == "true" {
+		out.WriteString("push constant 0\n")
+		return
+	}
+	if token.Token.Type == tokenizer.KEYWORD && token.Token.Raw == "false" {
+		out.WriteString("push constant 0\n")
+		out.WriteString("not\n")
+		return
+	}
+	fmt.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Token, token.Parent.Token.Raw)
+}
+
 func function(token *tokenizer.NestedToken, out *strings.Builder) {
-	var nVars int
+	params := token.Children()[0]
+	nVars := len(params.Children()) / 2
 	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Token.Raw, token.Token.Raw, nVars)
 	out.WriteString(cmd)
 }
