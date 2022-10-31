@@ -8,17 +8,17 @@ import (
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
 )
 
-func Output(compiled *tokenizer.NestedToken, out *strings.Builder) {
+func Output(compiled *tokenizer.Token, out *strings.Builder) {
 	PrintAST(compiled)
 	translate(compiled, out)
 }
 
-func PrintAST(compiled *tokenizer.NestedToken) {
+func PrintAST(compiled *tokenizer.Token) {
 	fmt.Println("printing AST...")
 
 	var line int
-	var fn func(*tokenizer.NestedToken, int)
-	fn = func(token *tokenizer.NestedToken, tabs int) {
+	var fn func(*tokenizer.Token, int)
+	fn = func(token *tokenizer.Token, tabs int) {
 		fmt.Printf("%d", line)
 		line++
 
@@ -34,7 +34,7 @@ func PrintAST(compiled *tokenizer.NestedToken) {
 	fn(compiled, 1)
 }
 
-func translate(token *tokenizer.NestedToken, out *strings.Builder) {
+func translate(token *tokenizer.Token, out *strings.Builder) {
 	// fmt.Printf("%+v\n", token)
 
 	if token == nil {
@@ -57,15 +57,15 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 		return
 	}
 	if token.Kind == "var" {
-		n, _ := strconv.Atoi(token.Token.Raw)
+		n, _ := strconv.Atoi(token.Raw)
 		push("local", n, out)
 		// pop("local", n, out)
 	}
 	if token.Kind == "arg" && token.Parent.Kind == "let" {
-		n, _ := strconv.Atoi(token.Token.Raw)
+		n, _ := strconv.Atoi(token.Raw)
 		pop("argument", n, out)
 	} else if token.Kind == "arg" {
-		n, _ := strconv.Atoi(token.Token.Raw)
+		n, _ := strconv.Atoi(token.Raw)
 		push("argument", n, out)
 	}
 	if token.Kind == "while" {
@@ -93,13 +93,13 @@ func translate(token *tokenizer.NestedToken, out *strings.Builder) {
 		)
 		return
 	}
-	if token.Token.Type == tokenizer.INT_CONST {
-		push("constant", token.Token.Raw, out)
+	if token.Type == tokenizer.INT_CONST {
+		push("constant", token.Raw, out)
 	}
-	if token.Token.Type == tokenizer.SYMBOL {
+	if token.Type == tokenizer.SYMBOL {
 		symbol(token, out)
 	}
-	if token.Token.Type == tokenizer.KEYWORD {
+	if token.Type == tokenizer.KEYWORD {
 		keyword(token, out)
 	}
 
@@ -118,7 +118,7 @@ func pop(dest string, index int, out *strings.Builder) {
 	out.WriteString(cmd)
 }
 
-func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
+func symbol(token *tokenizer.Token, out *strings.Builder) {
 	op := map[string]string{
 		"+": "add",
 		"-": "sub",
@@ -133,43 +133,43 @@ func symbol(token *tokenizer.NestedToken, out *strings.Builder) {
 		"-": "neg",
 		"~": "not",
 	}
-	if val, ok := unaryOp[token.Token.Raw]; token.Kind == "unary" && ok {
+	if val, ok := unaryOp[token.Raw]; token.Kind == "unary" && ok {
 		out.WriteString(val + "\n")
 		return
 	}
-	if val, ok := op[token.Token.Raw]; ok {
+	if val, ok := op[token.Raw]; ok {
 		out.WriteString(val + "\n")
 		return
 	}
-	fmt.Printf("WARNING: ignoring symbol %q\n", token.Token)
+	fmt.Printf("WARNING: ignoring symbol %q\n", token.Raw)
 }
 
-func keyword(token *tokenizer.NestedToken, out *strings.Builder) {
-	if token.Token.Type == tokenizer.KEYWORD && token.Token.Raw == "true" {
+func keyword(token *tokenizer.Token, out *strings.Builder) {
+	if token.Type == tokenizer.KEYWORD && token.Raw == "true" {
 		out.WriteString("push constant 0\n")
 		return
 	}
-	if token.Token.Type == tokenizer.KEYWORD && token.Token.Raw == "false" {
+	if token.Type == tokenizer.KEYWORD && token.Raw == "false" {
 		out.WriteString("push constant 0\n")
 		out.WriteString("not\n")
 		return
 	}
-	fmt.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Token, token.Parent.Token.Raw)
+	fmt.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Raw, token.Parent.Raw)
 }
 
-func function(token *tokenizer.NestedToken, out *strings.Builder) {
+func function(token *tokenizer.Token, out *strings.Builder) {
 	params := token.Children()[0]
 	nVars := len(params.Children()) / 2
-	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Token.Raw, token.Token.Raw, nVars)
+	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, nVars)
 	out.WriteString(cmd)
 }
 
-func subroutineCall(token *tokenizer.NestedToken, out *strings.Builder) {
-	cmd := fmt.Sprintf("call %s %d\n", token.Token.Raw, len(token.Parent.Children())-1)
+func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
+	cmd := fmt.Sprintf("call %s %d\n", token.Raw, len(token.Parent.Children())-1)
 	out.WriteString(cmd)
 }
 
-func returnCall(token *tokenizer.NestedToken, out *strings.Builder) {
+func returnCall(token *tokenizer.Token, out *strings.Builder) {
 	subroutineType := token.Parent.Parent.Parent.Kind
 	if subroutineType == "void" {
 		push("constant", 0, out)
@@ -179,7 +179,7 @@ func returnCall(token *tokenizer.NestedToken, out *strings.Builder) {
 
 var whileCounter = 0
 
-func while(token *tokenizer.NestedToken, expressionFn, statementsFn func(), out *strings.Builder) {
+func while(token *tokenizer.Token, expressionFn, statementsFn func(), out *strings.Builder) {
 	t := fmt.Sprintf("WHILE_EXP_%d", whileCounter)
 	f := fmt.Sprintf("WHILE_END_%d", whileCounter)
 	labelT := fmt.Sprintf("label %s\n", t)
@@ -198,7 +198,7 @@ func while(token *tokenizer.NestedToken, expressionFn, statementsFn func(), out 
 
 var ifCounter = 0
 
-func ifStatement(token *tokenizer.NestedToken, ifFn, elseFn func(), out *strings.Builder) {
+func ifStatement(token *tokenizer.Token, ifFn, elseFn func(), out *strings.Builder) {
 	ifFalse := fmt.Sprintf("IF_%d", ifCounter)
 	ifEnd := fmt.Sprintf("IF_END_%d", ifCounter)
 	labelFalse := fmt.Sprintf("label %s\n", ifFalse)

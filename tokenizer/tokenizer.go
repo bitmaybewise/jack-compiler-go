@@ -87,6 +87,7 @@ func (tk *Tokenizer) nextToken() Token {
 	tk.Current = Token{
 		Raw:  rawToken.String(),
 		Type: parseTokenType(rawToken.String()),
+		Kind: rawToken.String(),
 	}
 
 	return tk.Current
@@ -170,6 +171,24 @@ const (
 type Token struct {
 	Raw  string
 	Type TokenType
+
+	// nested token
+	Kind     string
+	Parent   *Token
+	children []*Token
+}
+
+func (nt *Token) Append(token *Token) {
+	if token == nil {
+		return
+	}
+
+	nt.children = append(nt.children, token)
+	token.Parent = nt
+}
+
+func (nt *Token) Children() []*Token {
+	return nt.children
 }
 
 func (t Token) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
@@ -254,29 +273,4 @@ func isString(value string) bool {
 
 func isIdentifier(value string) bool {
 	return regexp.MustCompile(`^\D[a-zA-Z0-9_]*`).Match([]byte(value))
-}
-
-type NestedToken struct {
-	Token    Token
-	Type     string
-	Kind     string
-	Parent   *NestedToken
-	children []*NestedToken
-}
-
-func (nt *NestedToken) Append(token *NestedToken) {
-	if token == nil {
-		return
-	}
-
-	nt.children = append(nt.children, token)
-	token.Parent = nt
-}
-
-func (nt *NestedToken) Children() []*NestedToken {
-	return nt.children
-}
-
-func MakeNestedToken(token *Token) *NestedToken {
-	return &NestedToken{Token: *token, Kind: token.Raw}
 }
