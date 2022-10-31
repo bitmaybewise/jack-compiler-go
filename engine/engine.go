@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/hlmerscher/jack-compiler-go/onerror"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
 )
 
@@ -32,32 +33,21 @@ func makeClassSymbolTable() map[string]*symbol {
 func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	classSymbolTable = makeClassSymbolTable()
 
-	classToken, err := processToken(tk, is("class"))
-	if err != nil {
-		return nil, err
-	}
+	classToken := processTokenOrPanics(tk, is("class"))
 
-	classNameToken, err := processToken(tk, isIdentifier())
-	if err != nil {
-		return nil, err
-	}
+	classNameToken := processTokenOrPanics(tk, isIdentifier())
 	class := classNameToken
 	class.Kind = classToken.Raw
 	classSymbolTable[classNameToken.Raw] = &symbol{}
 
-	_, err = processToken(tk, is("{"))
-	if err != nil {
-		return nil, err
-	}
+	processTokenOrPanics(tk, is("{"))
 
 	for {
 		_, err := CompileClassVarDec(tk)
 		if errors.Is(err, notClassVarDec) {
 			break
 		}
-		if err != nil {
-			return nil, err
-		}
+		onerror.Log(err)
 	}
 
 	for {
@@ -65,17 +55,12 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		if errors.Is(err, notSubroutineDec) {
 			break
 		}
-		if err != nil {
-			return nil, err
-		}
+		onerror.Log(err)
 
 		class.Append(subRoutineToken)
 	}
 
-	_, err = processToken(tk, is("}"))
-	if err != nil {
-		return nil, err
-	}
+	processTokenOrPanics(tk, is("}"))
 
 	return class, nil
 }
@@ -903,4 +888,10 @@ func processToken(tk *tokenizer.Tokenizer, matchers ...tokenMatcher) (*tokenizer
 	}
 
 	return &token, nil
+}
+
+func processTokenOrPanics(tk *tokenizer.Tokenizer, matchers ...tokenMatcher) *tokenizer.Token {
+	token, err := processToken(tk, matchers...)
+	onerror.Log(err)
+	return token
 }

@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/hlmerscher/jack-compiler-go/analyzer"
+	"github.com/hlmerscher/jack-compiler-go/onerror"
 )
 
 func main() {
@@ -39,20 +39,20 @@ func analyzeFile(filename string) {
 	out := new(strings.Builder)
 	err := analyzer.Compile(sourceFile, out)
 	if err != nil {
-		onError(err)
+		onerror.Log(err)
 	}
 	writeToFile(filename, out.String())
 }
 
 func openJackFile(filename string) *os.File {
 	inputFile, err := os.Open(filename)
-	onErrorf("error opening file\n", err)
+	onerror.Logf("error opening file\n", err)
 	return inputFile
 }
 
 func dirFilenames(dirname string) []string {
 	entries, err := os.ReadDir(dirname)
-	onErrorf("error reading directory\n", err)
+	onerror.Logf("error reading directory\n", err)
 
 	filenames := make([]string, 0)
 	for _, entry := range entries {
@@ -73,15 +73,5 @@ func writeToFile(filename string, content string) {
 	fmt.Printf("output:\t%s\n", outputFilename)
 
 	err := os.WriteFile(outputFilename, []byte(content), 0666)
-	onError(err)
-}
-
-func onError(err error) {
-	onErrorf("", err)
-}
-
-func onErrorf(msg string, err error) {
-	if err != nil {
-		log.Fatalf("\n%s%s", msg, err)
-	}
+	onerror.Log(err)
 }
