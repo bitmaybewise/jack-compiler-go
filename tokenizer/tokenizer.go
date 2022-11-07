@@ -168,6 +168,16 @@ const (
 	UNKNOWN      = TokenType("UNKNOWN")
 )
 
+type Var struct {
+	Index int
+	Type  string
+	Kind  string
+}
+
+func (v *Var) String() string {
+	return fmt.Sprintf("{index:%d type:%s kind:%s}", v.Index, v.Type, v.Kind)
+}
+
 type Token struct {
 	Raw  string
 	Type TokenType
@@ -176,6 +186,13 @@ type Token struct {
 	Kind     string
 	Parent   *Token
 	children []*Token
+
+	// var dec
+	Var *Var
+}
+
+func (t *Token) String() string {
+	return fmt.Sprintf("{%s:%s kind:%s var:%s}", t.Type, t.Raw, t.Kind, t.Var)
 }
 
 func (nt *Token) Append(token *Token) {
@@ -191,7 +208,7 @@ func (nt *Token) Children() []*Token {
 	return nt.children
 }
 
-func (t Token) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+func (t *Token) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	start.Name.Local = string(t.Type)
 	value := strings.Trim(t.Raw, "\"")
 	value = strings.Trim(value, "\n")
@@ -201,6 +218,21 @@ func (t Token) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 		return err
 	}
 	return nil
+}
+
+func (t *Token) NLocalVars() int {
+	var count int
+	for _, child := range t.Children() {
+		if child.Kind == "varDec" {
+			count += len(child.Children())
+		}
+		count += child.NLocalVars()
+	}
+	return count
+}
+
+func (t *Token) NStackVars() int {
+	return len(t.Parent.children) - 1
 }
 
 func parseTokenType(value string) TokenType {

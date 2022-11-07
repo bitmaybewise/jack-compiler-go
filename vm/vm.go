@@ -56,17 +56,24 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		returnCall(token, out)
 		return
 	}
-	if token.Kind == "var" {
+	if token.Kind == "varDec" {
+		varDec(token, out)
+	}
+	if token.Kind == "var" && token.Parent.Kind == "let" {
+		pop("local", token.Var.Index, out)
+	}
+	if token.Kind == "var" && token.Parent.Kind != "let" {
+		push("local", token.Var.Index, out)
+	}
+	if token.Kind == "varAssignment" {
 		n, _ := strconv.Atoi(token.Raw)
-		push("local", n, out)
-		// pop("local", n, out)
+		pop("local", n, out)
 	}
 	if token.Kind == "arg" && token.Parent.Kind == "let" {
-		n, _ := strconv.Atoi(token.Raw)
-		pop("argument", n, out)
-	} else if token.Kind == "arg" {
-		n, _ := strconv.Atoi(token.Raw)
-		push("argument", n, out)
+		pop("argument", token.Var.Index, out)
+	}
+	if token.Kind == "arg" && token.Parent.Kind != "let" {
+		push("argument", token.Var.Index, out)
 	}
 	if token.Kind == "while" {
 		children := token.Children()
@@ -108,6 +115,9 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	}
 }
 
+func varDec(token *tokenizer.Token, out *strings.Builder) {
+}
+
 func push(dest string, value any, out *strings.Builder) {
 	cmd := fmt.Sprintf("push %s %v\n", dest, value)
 	out.WriteString(cmd)
@@ -147,25 +157,23 @@ func symbol(token *tokenizer.Token, out *strings.Builder) {
 func keyword(token *tokenizer.Token, out *strings.Builder) {
 	if token.Type == tokenizer.KEYWORD && token.Raw == "true" {
 		out.WriteString("push constant 0\n")
+		out.WriteString("not\n")
 		return
 	}
 	if token.Type == tokenizer.KEYWORD && token.Raw == "false" {
 		out.WriteString("push constant 0\n")
-		out.WriteString("not\n")
 		return
 	}
 	fmt.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Raw, token.Parent.Raw)
 }
 
 func function(token *tokenizer.Token, out *strings.Builder) {
-	params := token.Children()[0]
-	nVars := len(params.Children()) / 2
-	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, nVars)
+	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, token.NLocalVars())
 	out.WriteString(cmd)
 }
 
 func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
-	cmd := fmt.Sprintf("call %s %d\n", token.Raw, len(token.Parent.Children())-1)
+	cmd := fmt.Sprintf("call %s %d\n", token.Raw, token.NStackVars())
 	out.WriteString(cmd)
 }
 
