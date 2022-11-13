@@ -211,6 +211,7 @@ func ifStatement(token *tokenizer.Token, ifFn, elseFn func(), out *strings.Build
 	ifEnd := fmt.Sprintf("IF_END_%d", ifCounter)
 	labelFalse := fmt.Sprintf("label %s\n", ifFalse)
 	labelEnd := fmt.Sprintf("label %s\n", ifEnd)
+	ifCounter++
 
 	out.WriteString("not\n")
 	out.WriteString(fmt.Sprintf("if-goto %s\n", ifFalse))
@@ -219,6 +220,4 @@ func ifStatement(token *tokenizer.Token, ifFn, elseFn func(), out *strings.Build
 	out.WriteString(labelFalse)
 	elseFn() // compiled statements
 	out.WriteString(labelEnd)
-
-	ifCounter++
 }
