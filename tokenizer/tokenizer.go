@@ -192,7 +192,17 @@ type Token struct {
 }
 
 func (t *Token) String() string {
-	return fmt.Sprintf("{%s:%s kind:%s var:%s}", t.Type, t.Raw, t.Kind, t.Var)
+	var s []string
+	s = []string{fmt.Sprintf("%s:%s", t.Type, t.Raw)}
+
+	if t.Kind != "" {
+		s = append(s, fmt.Sprintf("kind:%s", t.Kind))
+	}
+	if t.Var != nil {
+		s = append(s, fmt.Sprintf("var:%s", t.Var))
+	}
+
+	return fmt.Sprintf("(%s)", strings.Join(s, " "))
 }
 
 func (nt *Token) Append(token *Token) {
