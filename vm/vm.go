@@ -35,52 +35,53 @@ func PrintAST(compiled *tokenizer.Token) {
 }
 
 func translate(token *tokenizer.Token, out *strings.Builder) {
-	if token == nil {
+	switch {
+	case token == nil:
 		return
-	}
-	if token.Kind == "function" || token.Kind == "constructor" {
+
+	case token.Kind == "function" || token.Kind == "constructor":
 		function(token, out)
-	}
-	if token.Kind == "subroutineCall" {
+
+	case token.Kind == "subroutineCall":
 		subroutineCall(token, out)
 		if token.Parent.Parent.Kind == "do" {
 			pop("temp", 0, out)
 		}
-	}
-	if token.Kind == "return" {
+
+	case token.Kind == "return":
 		for _, expression := range token.Children() {
 			translate(expression, out)
 		}
 		returnCall(token, out)
 		return
-	}
-	if token.Kind == "this" {
+
+	case token.Kind == "this":
 		this(token, out)
 		return
-	}
-	if token.Kind == "var" && token.Parent.Kind == "let" {
+
+	case token.Kind == "var" && token.Parent.Kind == "let":
 		pop("local", token.Var.Index, out)
-	}
-	if token.Kind == "var" && token.Parent.Kind != "let" {
+
+	case token.Kind == "var" && token.Parent.Kind != "let":
 		push("local", token.Var.Index, out)
-	}
-	if token.Kind == "field" && token.Parent.Kind == "let" {
+
+	case token.Kind == "field" && token.Parent.Kind == "let":
 		pop("static", token.Var.Index, out)
-	}
-	if token.Kind == "field" && token.Parent.Kind != "let" {
+
+	case token.Kind == "field" && token.Parent.Kind != "let":
 		push("static", token.Var.Index, out)
-	}
-	if token.Kind == "varAssignment" {
+
+	case token.Kind == "varAssignment":
 		n, _ := strconv.Atoi(token.Raw)
 		pop("local", n, out)
-	}
-	if token.Kind == "arg" && token.Parent.Kind == "let" {
+
+	case token.Kind == "arg" && token.Parent.Kind == "let":
 		pop("argument", token.Var.Index, out)
-	}
-	if token.Kind == "arg" && token.Parent.Kind != "let" {
+
+	case token.Kind == "arg" && token.Parent.Kind != "let":
 		push("argument", token.Var.Index, out)
-	}
-	if token.Kind == "while" {
+
+	case token.Kind == "while":
 		children := token.Children()
 		expression, statements := children[0], children[1]
 		while(
@@ -90,8 +91,8 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 			out,
 		)
 		return
-	}
-	if token.Kind == "if" {
+
+	case token.Kind == "if":
 		children := token.Children()
 		exp := children[0]
 		translate(exp, out)
@@ -104,15 +105,16 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 			out,
 		)
 		return
-	}
-	if token.Type == tokenizer.INT_CONST {
+
+	case token.Type == tokenizer.INT_CONST:
 		push("constant", token.Raw, out)
-	}
-	if token.Type == tokenizer.SYMBOL {
+
+	case token.Type == tokenizer.SYMBOL:
 		symbol(token, out)
-	}
-	if token.Type == tokenizer.KEYWORD {
+
+	case token.Type == tokenizer.KEYWORD:
 		keyword(token, out)
+
 	}
 
 	for _, child := range token.Children() {
