@@ -35,12 +35,10 @@ func PrintAST(compiled *tokenizer.Token) {
 }
 
 func translate(token *tokenizer.Token, out *strings.Builder) {
-	// fmt.Printf("%+v\n", token)
-
 	if token == nil {
 		return
 	}
-	if token.Kind == "function" {
+	if token.Kind == "function" || token.Kind == "constructor" {
 		function(token, out)
 	}
 	if token.Kind == "subroutineCall" {
@@ -56,14 +54,21 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		returnCall(token, out)
 		return
 	}
-	if token.Kind == "varDec" {
-		varDec(token, out)
+	if token.Kind == "this" {
+		this(token, out)
+		return
 	}
 	if token.Kind == "var" && token.Parent.Kind == "let" {
 		pop("local", token.Var.Index, out)
 	}
 	if token.Kind == "var" && token.Parent.Kind != "let" {
 		push("local", token.Var.Index, out)
+	}
+	if token.Kind == "field" && token.Parent.Kind == "let" {
+		pop("static", token.Var.Index, out)
+	}
+	if token.Kind == "field" && token.Parent.Kind != "let" {
+		push("static", token.Var.Index, out)
 	}
 	if token.Kind == "varAssignment" {
 		n, _ := strconv.Atoi(token.Raw)
@@ -113,9 +118,6 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	for _, child := range token.Children() {
 		translate(child, out)
 	}
-}
-
-func varDec(token *tokenizer.Token, out *strings.Builder) {
 }
 
 func push(dest string, value any, out *strings.Builder) {
@@ -170,6 +172,12 @@ func keyword(token *tokenizer.Token, out *strings.Builder) {
 func function(token *tokenizer.Token, out *strings.Builder) {
 	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, token.NLocalVars())
 	out.WriteString(cmd)
+
+	if token.Kind == "constructor" {
+		out.WriteString(fmt.Sprintf("push constant %d\n", token.Parent.NFields))
+		out.WriteString("call Memory.alloc 1\n")
+		out.WriteString("pop pointer 0\n")
+	}
 }
 
 func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
@@ -183,6 +191,10 @@ func returnCall(token *tokenizer.Token, out *strings.Builder) {
 		push("constant", 0, out)
 	}
 	out.WriteString("return\n")
+}
+
+func this(token *tokenizer.Token, out *strings.Builder) {
+	out.WriteString("push pointer 0\n")
 }
 
 var whileCounter = 0

@@ -32,14 +32,17 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	classNameToken := processTokenOrPanics(tk, isIdentifier())
 	class := classNameToken
 	class.Kind = classToken.Raw
-	classSymbolTable[classNameToken.Raw] = &tokenizer.Var{}
 
 	processTokenOrPanics(tk, is("{"))
 
+	var nvars int
 	for {
-		_, err := CompileClassVarDec(tk)
+		varDec, err := CompileClassVarDec(tk, &nvars)
 		if errors.Is(err, notClassVarDec) {
 			break
+		}
+		if varDec.Kind == "field" {
+			class.NFields++
 		}
 		onerror.Log(err)
 	}
@@ -196,9 +199,7 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	return nestedToken, nil
 }
 
-func CompileClassVarDec(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
-	nestedToken := &tokenizer.Token{Raw: "classVarDec"}
-
+func CompileClassVarDec(tk *tokenizer.Tokenizer, nvars *int) (*tokenizer.Token, error) {
 	matcher := or(is("static"), is("field"))
 	if _, ok := matcher(tk.Current); !ok {
 		return nil, notClassVarDec
@@ -208,6 +209,7 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+	nestedToken := classVarDecToken
 	nestedToken.Append(classVarDecToken)
 
 	typeToken, err := processToken(tk, isType())
@@ -225,8 +227,9 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		classSymbolTable[varNameToken.Raw] = &tokenizer.Var{
 			Type:  typeToken.Raw,
 			Kind:  classVarDecToken.Raw,
-			Index: i,
+			Index: *nvars,
 		}
+		*nvars++
 
 		commaToken, err := processToken(tk, is(","))
 		if err != nil {
