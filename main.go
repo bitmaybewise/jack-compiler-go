@@ -7,17 +7,21 @@ import (
 	"strings"
 
 	"github.com/hlmerscher/jack-compiler-go/analyzer"
+	"github.com/hlmerscher/jack-compiler-go/logger"
 	"github.com/hlmerscher/jack-compiler-go/onerror"
 )
 
 func main() {
 	var filename, dirname string
+	var verbose bool
 	flag.StringVar(&filename, "f", "", "the filename of the vm source file")
 	flag.StringVar(&dirname, "d", "", "the directory of the vm source files")
+	flag.BoolVar(&verbose, "v", false, "verbose output")
 	flag.Parse()
 	if filename == "" && dirname == "" {
 		panic("filename/directory is missing")
 	}
+	logger.Toggle(verbose)
 
 	if filename != "" {
 		analyzeFile(filename)
