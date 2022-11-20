@@ -188,8 +188,8 @@ type Token struct {
 	children []*Token
 	NFields  int
 
-	// var dec
-	Var *Var
+	Var    *Var
+	Method *Var
 }
 
 func (t *Token) String() string {
@@ -201,6 +201,9 @@ func (t *Token) String() string {
 	}
 	if t.Var != nil {
 		s = append(s, fmt.Sprintf("var:%s", t.Var))
+	}
+	if t.Method != nil {
+		s = append(s, fmt.Sprintf("method:%s", t.Method))
 	}
 	if t.Kind == "class" {
 		s = append(s, fmt.Sprintf("nFields:%d", t.NFields))

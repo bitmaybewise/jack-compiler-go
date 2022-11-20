@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hlmerscher/jack-compiler-go/logger"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
 )
 
@@ -14,18 +15,18 @@ func Output(compiled *tokenizer.Token, out *strings.Builder) {
 }
 
 func PrintAST(compiled *tokenizer.Token) {
-	fmt.Println("printing AST...")
+	logger.Println("printing AST...")
 
 	var line int
 	var fn func(*tokenizer.Token, int)
 	fn = func(token *tokenizer.Token, tabs int) {
-		fmt.Printf("%d", line)
+		logger.Printf("%d", line)
 		line++
 
 		for i := 0; i < tabs; i++ {
-			fmt.Print("\t")
+			logger.Print("\t")
 		}
-		fmt.Printf("%+v\n", token)
+		logger.Printf("%+v\n", token)
 
 		for _, child := range token.Children() {
 			fn(child, tabs+1)
@@ -39,7 +40,7 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	case token == nil:
 		return
 
-	case token.Kind == "function" || token.Kind == "constructor":
+	case token.Kind == "function" || token.Kind == "constructor" || token.Kind == "method":
 		function(token, out)
 
 	case token.Kind == "subroutineCall":
@@ -66,9 +67,15 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		push("local", token.Var.Index, out)
 
 	case token.Kind == "field" && token.Parent.Kind == "let":
-		pop("static", token.Var.Index, out)
+		pop("this", token.Var.Index, out)
 
 	case token.Kind == "field" && token.Parent.Kind != "let":
+		push("this", token.Var.Index, out)
+
+	case token.Kind == "static" && token.Parent.Kind == "let":
+		pop("static", token.Var.Index, out)
+
+	case token.Kind == "static" && token.Parent.Kind != "let":
 		push("static", token.Var.Index, out)
 
 	case token.Kind == "varAssignment":
@@ -96,12 +103,18 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		children := token.Children()
 		exp := children[0]
 		translate(exp, out)
-		trueStatements := children[1]
-		falseStatements := children[3]
 		ifStatement(
 			token,
-			func() { translate(trueStatements, out) },
-			func() { translate(falseStatements, out) },
+			func() {
+				trueStatements := children[1]
+				translate(trueStatements, out)
+			},
+			func() {
+				if len(children) >= 3 {
+					falseStatements := children[3]
+					translate(falseStatements, out)
+				}
+			},
 			out,
 		)
 		return
@@ -155,7 +168,7 @@ func symbol(token *tokenizer.Token, out *strings.Builder) {
 		out.WriteString(val + "\n")
 		return
 	}
-	fmt.Printf("WARNING: ignoring symbol %q\n", token.Raw)
+	logger.Printf("WARNING: ignoring symbol %q\n", token.Raw)
 }
 
 func keyword(token *tokenizer.Token, out *strings.Builder) {
@@ -168,7 +181,7 @@ func keyword(token *tokenizer.Token, out *strings.Builder) {
 		out.WriteString("push constant 0\n")
 		return
 	}
-	fmt.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Raw, token.Parent.Raw)
+	logger.Printf("WARNING: ignoring keyword %q, parent %q\n", token.Raw, token.Parent.Raw)
 }
 
 func function(token *tokenizer.Token, out *strings.Builder) {
@@ -180,11 +193,28 @@ func function(token *tokenizer.Token, out *strings.Builder) {
 		out.WriteString("call Memory.alloc 1\n")
 		out.WriteString("pop pointer 0\n")
 	}
+	if token.Kind == "method" {
+		out.WriteString("push argument 0\n")
+		out.WriteString("pop pointer 0\n")
+	}
 }
 
 func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
-	cmd := fmt.Sprintf("call %s %d\n", token.Raw, token.NStackVars())
-	out.WriteString(cmd)
+	if token.Method == nil {
+		cmd := fmt.Sprintf("call %s %d\n", token.Raw, token.NStackVars())
+		out.WriteString(cmd)
+		return
+	}
+
+	if token.Method.Kind == "field" {
+		out.WriteString(fmt.Sprintf("push this %d\n", token.Method.Index))
+	}
+	// if token.Method.Kind == "class" {
+	// 	out.WriteString(fmt.Sprintf("push this %d\n", token.Method.Index))
+	// }
+	out.WriteString(
+		fmt.Sprintf("call %s.%s %d\n", token.Method.Type, token.Raw, token.NStackVars()+1),
+	)
 }
 
 func returnCall(token *tokenizer.Token, out *strings.Builder) {
@@ -206,6 +236,7 @@ func while(token *tokenizer.Token, expressionFn, statementsFn func(), out *strin
 	f := fmt.Sprintf("WHILE_END_%d", whileCounter)
 	labelT := fmt.Sprintf("label %s\n", t)
 	labelF := fmt.Sprintf("label %s\n", f)
+	whileCounter++
 
 	out.WriteString(labelT)
 	expressionFn() // compiled expression
@@ -214,8 +245,6 @@ func while(token *tokenizer.Token, expressionFn, statementsFn func(), out *strin
 	statementsFn() // compiled statements
 	out.WriteString(fmt.Sprintf("goto %s\n", t))
 	out.WriteString(labelF)
-
-	whileCounter++
 }
 
 var ifCounter = 0

@@ -32,6 +32,11 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	classNameToken := processTokenOrPanics(tk, isIdentifier())
 	class := classNameToken
 	class.Kind = classToken.Raw
+	classSymbolTable["this"] = &tokenizer.Var{
+		Index: 0,
+		Type:  classNameToken.Raw,
+		Kind:  "class",
+	}
 
 	processTokenOrPanics(tk, is("{"))
 
@@ -42,7 +47,11 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 			break
 		}
 		if varDec.Kind == "field" {
-			class.NFields++
+			for _, child := range varDec.Children() {
+				if child.Type == "identifier" {
+					class.NFields++
+				}
+			}
 		}
 		logger.Error(err)
 	}
@@ -314,6 +323,15 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if subRoutineDecToken.Kind == "method" {
+		subRoutineNameToken.Var = &tokenizer.Var{
+			Index: 0,
+			Kind:  "arg",
+			Type:  classSymbolTable["this"].Type,
+		}
+	}
+
 	nestedToken := subRoutineNameToken
 	nestedToken.Kind = subRoutineDecToken.Raw
 	nestedToken.Type = tokenizer.TokenType(subRoutineTypeToken.Kind)
@@ -324,7 +342,6 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	}
 
 	paramsToken, err := CompileParameterList(tk)
-	// _, err = CompileParameterList(tk)
 	if err != nil {
 		return nil, err
 	}
@@ -549,8 +566,6 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		return nil, err
 	}
 
-	// fmt.Printf("LET SYMBOL \t %s => %+v\n", termToken, sym)
-
 	termToken.Type = tokenizer.TokenType(sym.Type)
 	termToken.Kind = sym.Kind
 	// termToken.Kind = "varAssignment"
@@ -704,6 +719,16 @@ func CompileDo(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	subroutineCall := varClassNameToken
 	subroutineCall.Kind = "subroutineCall"
 
+	startsWithLowercase, _ := regexp.MatchString("^[a-z]+", subroutineCall.Raw)
+
+	_var, err := enforceVarDec(tk, subroutineCall)
+	if err == nil && _var != nil {
+		subroutineCall.Method = _var
+	} else if startsWithLowercase {
+		// subroutineCall.Method = &tokenizer.Var{Type: classSymbolTable["this"].Type}
+		subroutineCall.Method = classSymbolTable["this"]
+	}
+
 	if _, ok := is(".")(tk.Current); ok {
 		dotToken, err := processToken(tk, is("."))
 		if err != nil {
@@ -716,6 +741,9 @@ func CompileDo(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 			return nil, err
 		}
 		subroutineCall.Raw += subroutineNameToken.Raw
+		if _var != nil {
+			subroutineCall.Raw = subroutineNameToken.Raw
+		}
 	}
 
 	_, err = processToken(tk, is("("))
