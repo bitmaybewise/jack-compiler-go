@@ -125,7 +125,9 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	case token.Type == tokenizer.SYMBOL:
 		symbol(token, out)
 
-	case token.Type == tokenizer.KEYWORD:
+	case token.Type == tokenizer.KEYWORD &&
+		token.Raw != "do" &&
+		token.Raw != "let":
 		keyword(token, out)
 
 	}
