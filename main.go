@@ -8,7 +8,6 @@ import (
 
 	"github.com/hlmerscher/jack-compiler-go/analyzer"
 	"github.com/hlmerscher/jack-compiler-go/logger"
-	"github.com/hlmerscher/jack-compiler-go/onerror"
 )
 
 func main() {
@@ -43,20 +42,20 @@ func analyzeFile(filename string) {
 	out := new(strings.Builder)
 	err := analyzer.Compile(sourceFile, out)
 	if err != nil {
-		onerror.Log(err)
+		logger.Error(err)
 	}
 	writeToFile(filename, out.String())
 }
 
 func openJackFile(filename string) *os.File {
 	inputFile, err := os.Open(filename)
-	onerror.Logf("error opening file\n", err)
+	logger.Errorf("error opening file\n", err)
 	return inputFile
 }
 
 func dirFilenames(dirname string) []string {
 	entries, err := os.ReadDir(dirname)
-	onerror.Logf("error reading directory\n", err)
+	logger.Errorf("error reading directory\n", err)
 
 	filenames := make([]string, 0)
 	for _, entry := range entries {
@@ -77,5 +76,5 @@ func writeToFile(filename string, content string) {
 	fmt.Printf("output:\t%s\n", outputFilename)
 
 	err := os.WriteFile(outputFilename, []byte(content), 0666)
-	onerror.Log(err)
+	logger.Error(err)
 }

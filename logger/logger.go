@@ -1,6 +1,9 @@
 package logger
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 var verbose = false
 
@@ -30,4 +33,14 @@ func Println(values ...any) {
 	}
 
 	fmt.Println(values...)
+}
+
+func Error(err error) {
+	Errorf("", err)
+}
+
+func Errorf(msg string, err error) {
+	if err != nil {
+		log.Fatalf("\n%s%s", msg, err)
+	}
 }

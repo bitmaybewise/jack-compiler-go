@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/hlmerscher/jack-compiler-go/onerror"
+	"github.com/hlmerscher/jack-compiler-go/logger"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
 )
 
@@ -44,7 +44,7 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		if varDec.Kind == "field" {
 			class.NFields++
 		}
-		onerror.Log(err)
+		logger.Error(err)
 	}
 
 	for {
@@ -52,7 +52,7 @@ func CompileClass(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		if errors.Is(err, notSubroutineDec) {
 			break
 		}
-		onerror.Log(err)
+		logger.Error(err)
 
 		class.Append(subRoutineToken)
 	}
@@ -902,6 +902,6 @@ func processToken(tk *tokenizer.Tokenizer, matchers ...tokenMatcher) (*tokenizer
 
 func processTokenOrPanics(tk *tokenizer.Tokenizer, matchers ...tokenMatcher) *tokenizer.Token {
 	token, err := processToken(tk, matchers...)
-	onerror.Log(err)
+	logger.Error(err)
 	return token
 }
