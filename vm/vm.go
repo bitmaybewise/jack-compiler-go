@@ -64,7 +64,13 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		pop("local", token.Var.Index, out)
 
 	case token.Kind == "var" && token.Parent.Kind != "let":
-		push("local", token.Var.Index, out)
+		types := map[string]string{
+			"field": "this",
+			"arg":   "argument",
+			"var":   "local",
+		}
+		where := types[token.Var.Kind]
+		push(where, token.Var.Index, out)
 
 	case token.Kind == "field" && token.Parent.Kind == "let":
 		pop("this", token.Var.Index, out)
@@ -187,8 +193,9 @@ func keyword(token *tokenizer.Token, out *strings.Builder) {
 }
 
 func function(token *tokenizer.Token, out *strings.Builder) {
-	cmd := fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, token.NLocalVars())
-	out.WriteString(cmd)
+	out.WriteString(
+		fmt.Sprintf("function %s.%s %d\n", token.Parent.Raw, token.Raw, token.NLocalVars()),
+	)
 
 	if token.Kind == "constructor" {
 		out.WriteString(fmt.Sprintf("push constant %d\n", token.Parent.NFields))
@@ -202,18 +209,29 @@ func function(token *tokenizer.Token, out *strings.Builder) {
 }
 
 func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
-	if token.Method == nil {
-		cmd := fmt.Sprintf("call %s %d\n", token.Raw, token.NStackVars())
-		out.WriteString(cmd)
+	if token.Constructor != nil {
+		out.WriteString(
+			fmt.Sprintf("call %s.%s %d\n", token.Constructor.Type, token.Raw, token.NStackVars()),
+		)
 		return
 	}
 
+	if token.Method == nil {
+		out.WriteString(
+			fmt.Sprintf("call %s %d\n", token.Raw, token.NStackVars()),
+		)
+		return
+	}
+
+	if token.Method.Kind == "class" {
+		out.WriteString(fmt.Sprintf("push pointer %d\n", token.Method.Index))
+	}
 	if token.Method.Kind == "field" {
 		out.WriteString(fmt.Sprintf("push this %d\n", token.Method.Index))
 	}
-	// if token.Method.Kind == "class" {
-	// 	out.WriteString(fmt.Sprintf("push this %d\n", token.Method.Index))
-	// }
+	if token.Method.Kind == "var" {
+		out.WriteString(fmt.Sprintf("push local %d\n", token.Method.Index))
+	}
 	out.WriteString(
 		fmt.Sprintf("call %s.%s %d\n", token.Method.Type, token.Raw, token.NStackVars()+1),
 	)

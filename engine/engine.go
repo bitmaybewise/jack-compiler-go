@@ -107,7 +107,8 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 	// varName
 	termToken := processTokenOrPanics(tk, isTerm())
-	if _, err := enforceVarDec(tk, termToken); err != nil {
+	_var, err := enforceVarDec(tk, termToken)
+	if err != nil {
 		return nil, err
 	}
 
@@ -130,11 +131,20 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 	// subroutineCall
 	if _, ok := is(".")(tk.Current); ok {
-		dotToken := processTokenOrPanics(tk, is("."))
-		termToken.Raw += dotToken.Raw
+		if _var != nil {
+			termToken.Method = _var
+		} else {
+			termToken.Constructor = &tokenizer.Var{
+				Type: termToken.Kind,
+				Kind: "constructor",
+			}
+		}
+		termToken.Kind = "subroutineCall"
+
+		processTokenOrPanics(tk, is("."))
 
 		subroutineNameToken := processTokenOrPanics(tk, isIdentifier())
-		termToken.Raw += subroutineNameToken.Raw
+		termToken.Raw = subroutineNameToken.Raw
 
 		processTokenOrPanics(tk, is("("))
 
@@ -147,15 +157,10 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 		processTokenOrPanics(tk, is(")"))
 
-		termToken.Kind = "subroutineCall"
 		return nestedToken, nil
 	}
 
 	if termToken.Type == tokenizer.IDENTIFIER {
-		_var, err := enforceVarDec(tk, termToken)
-		if err != nil {
-			return nil, err
-		}
 		termToken.Var = _var
 		termToken.Kind = "var"
 	}
@@ -268,12 +273,14 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	subRoutineTypeToken := processTokenOrPanics(tk, is("void"), isType())
 	subRoutineNameToken := processTokenOrPanics(tk, isIdentifier())
 
+	var args int
 	if subRoutineDecToken.Kind == "method" {
 		subRoutineNameToken.Var = &tokenizer.Var{
 			Index: 0,
 			Kind:  "arg",
 			Type:  classSymbolTable["this"].Type,
 		}
+		args++
 	}
 
 	nestedToken := subRoutineNameToken
@@ -282,7 +289,7 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 	processTokenOrPanics(tk, is("("))
 
-	paramsToken := CompileParameterList(tk)
+	paramsToken := CompileParameterList(tk, &args)
 	nestedToken.Append(paramsToken)
 
 	processTokenOrPanics(tk, is(")"))
@@ -296,10 +303,10 @@ func CompileSubroutine(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	return nestedToken, nil
 }
 
-func CompileParameterList(tk *tokenizer.Tokenizer) *tokenizer.Token {
+func CompileParameterList(tk *tokenizer.Tokenizer, args *int) *tokenizer.Token {
 	nestedToken := &tokenizer.Token{Raw: "parameterList"}
 
-	for i := 0; ; i++ {
+	for i := *args; ; i++ {
 		if _, ok := isType()(tk.Current); !ok {
 			break
 		}
@@ -470,15 +477,9 @@ func CompileReturn(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 }
 
 func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
-	let, err := processToken(tk, is("let"))
-	if err != nil {
-		return nil, err
-	}
+	let := processTokenOrPanics(tk, is("let"))
 
-	termToken, err := processToken(tk, isIdentifier())
-	if err != nil {
-		return nil, err
-	}
+	termToken := processTokenOrPanics(tk, isIdentifier())
 	sym, err := enforceVarDec(tk, termToken)
 	if err != nil {
 		return nil, err
@@ -486,15 +487,10 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 	termToken.Type = tokenizer.TokenType(sym.Type)
 	termToken.Kind = sym.Kind
-	// termToken.Kind = "varAssignment"
-	// termToken.Raw = fmt.Sprint(sym.index)
 	termToken.Var = sym
 
 	if _, ok := is("[")(tk.Current); ok {
-		_, err := processToken(tk, is("["))
-		if err != nil {
-			return nil, err
-		}
+		processTokenOrPanics(tk, is("["))
 
 		expToken, err := CompileExpression(tk)
 		if err != nil {
@@ -502,16 +498,10 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		}
 		let.Append(expToken)
 
-		_, err = processToken(tk, is("]"))
-		if err != nil {
-			return nil, err
-		}
+		processTokenOrPanics(tk, is("]"))
 	}
 
-	_, err = processToken(tk, is("="))
-	if err != nil {
-		return nil, err
-	}
+	processTokenOrPanics(tk, is("="))
 
 	expToken, err := CompileExpression(tk)
 	if err != nil {
@@ -519,10 +509,7 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	}
 	let.Append(expToken)
 
-	_, err = processToken(tk, is(";"))
-	if err != nil {
-		return nil, err
-	}
+	processTokenOrPanics(tk, is(";"))
 
 	let.Append(termToken)
 
