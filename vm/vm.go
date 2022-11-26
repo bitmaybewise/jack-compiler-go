@@ -131,6 +131,9 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	case token.Type == tokenizer.SYMBOL:
 		symbol(token, out)
 
+	case token.Type == tokenizer.STRING_CONST:
+		pushString(token, out)
+
 	case token.Type == tokenizer.KEYWORD &&
 		token.Raw != "do" &&
 		token.Raw != "let":
@@ -283,4 +286,17 @@ func ifStatement(token *tokenizer.Token, ifFn, elseFn func(), out *strings.Build
 	out.WriteString(labelFalse)
 	elseFn() // compiled statements
 	out.WriteString(labelEnd)
+}
+
+func pushString(token *tokenizer.Token, out *strings.Builder) {
+	// push constant with length of string (excluding quotes)
+	out.WriteString(fmt.Sprintf("push constant %d\n", len(token.Raw)-2))
+	out.WriteString("call String.new 1\n")
+	for _, char := range token.Raw {
+		if char == '"' {
+			continue
+		}
+		out.WriteString(fmt.Sprintf("push constant %d\n", char))
+		out.WriteString("call String.appendChar 2\n") // 2 because 1 is the string ref, 1 is the char
+	}
 }
