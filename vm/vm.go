@@ -36,6 +36,8 @@ func PrintAST(compiled *tokenizer.Token) {
 }
 
 func translate(token *tokenizer.Token, out *strings.Builder) {
+	// out.WriteString(fmt.Sprintf("// %s\n", token))
+
 	switch {
 	case token == nil:
 		return
@@ -61,16 +63,28 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		return
 
 	case token.Kind == "var" && token.Parent.Kind == "let":
-		pop("local", token.Var.Index, out)
+		if token.ArrayIndex != nil {
+			out.WriteString("pop temp 0\n")
+			push(varTypes[token.Var.Kind], token.Var.Index, out)
+			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
+			out.WriteString("add\n")
+			out.WriteString("pop pointer 1\n")
+			out.WriteString("push temp 0\n")
+			out.WriteString("pop that 0\n")
+		} else {
+			pop("local", token.Var.Index, out)
+		}
 
 	case token.Kind == "var" && token.Parent.Kind != "let":
-		types := map[string]string{
-			"field": "this",
-			"arg":   "argument",
-			"var":   "local",
+		if token.ArrayIndex != nil {
+			push(varTypes[token.Var.Kind], token.Var.Index, out)
+			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
+			out.WriteString("add\n")
+			out.WriteString("pop pointer 1\n")
+			out.WriteString("push that 0\n")
+		} else {
+			push(varTypes[token.Var.Kind], token.Var.Index, out)
 		}
-		where := types[token.Var.Kind]
-		push(where, token.Var.Index, out)
 
 	case token.Kind == "field" && token.Parent.Kind == "let":
 		pop("this", token.Var.Index, out)
@@ -144,6 +158,12 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	for _, child := range token.Children() {
 		translate(child, out)
 	}
+}
+
+var varTypes = map[string]string{
+	"field": "this",
+	"arg":   "argument",
+	"var":   "local",
 }
 
 func push(dest string, value any, out *strings.Builder) {

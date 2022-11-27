@@ -191,6 +191,7 @@ type Token struct {
 	Var         *Var
 	Method      *Var
 	Constructor *Var
+	ArrayIndex  *Token
 }
 
 func (t *Token) String() string {
@@ -211,6 +212,9 @@ func (t *Token) String() string {
 	}
 	if t.Kind == "class" {
 		s = append(s, fmt.Sprintf("nFields:%d", t.NFields))
+	}
+	if t.ArrayIndex != nil {
+		s = append(s, fmt.Sprintf("array: %s", t.ArrayIndex))
 	}
 
 	return fmt.Sprintf("(%s)", strings.Join(s, " "))

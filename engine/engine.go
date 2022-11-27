@@ -114,17 +114,19 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 	// varName[expression]
 	if _, ok := is("[")(tk.Current); ok {
-		openArrayToken := processTokenOrPanics(tk, is("["))
-		nestedToken.Append(openArrayToken)
+		processTokenOrPanics(tk, is("["))
 
 		expToken, err := CompileExpression(tk)
 		if err != nil {
 			return nil, err
 		}
-		nestedToken.Append(expToken)
+		arrayIndex := expToken.Children()[0]
+		termToken.ArrayIndex = arrayIndex
+		termToken.Var = _var
+		termToken.Kind = _var.Kind
+		nestedToken.Append(termToken)
 
-		closeArrayToken := processTokenOrPanics(tk, is("]"))
-		nestedToken.Append(closeArrayToken)
+		processTokenOrPanics(tk, is("]"))
 
 		return nestedToken, nil
 	}
@@ -490,13 +492,16 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	termToken.Var = sym
 
 	if _, ok := is("[")(tk.Current); ok {
+		// let.Append(termToken)
+
 		processTokenOrPanics(tk, is("["))
 
 		expToken, err := CompileExpression(tk)
 		if err != nil {
 			return nil, err
 		}
-		let.Append(expToken)
+		// let.Append(expToken)
+		termToken.ArrayIndex = expToken.Children()[0]
 
 		processTokenOrPanics(tk, is("]"))
 	}
