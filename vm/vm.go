@@ -36,7 +36,7 @@ func PrintAST(compiled *tokenizer.Token) {
 }
 
 func translate(token *tokenizer.Token, out *strings.Builder) {
-	// out.WriteString(fmt.Sprintf("// %s\n", token))
+	out.WriteString(fmt.Sprintf("// %s\n", token))
 
 	switch {
 	case token == nil:
@@ -72,7 +72,7 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 			out.WriteString("push temp 0\n")
 			out.WriteString("pop that 0\n")
 		} else {
-			pop("local", token.Var.Index, out)
+			pop(varTypes[token.Var.Kind], token.Var.Index, out)
 		}
 
 	case token.Kind == "var" && token.Parent.Kind != "let":
@@ -161,9 +161,10 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 }
 
 var varTypes = map[string]string{
-	"field": "this",
-	"arg":   "argument",
-	"var":   "local",
+	"field":  "this",
+	"arg":    "argument",
+	"var":    "local",
+	"static": "static",
 }
 
 func push(dest string, value any, out *strings.Builder) {
