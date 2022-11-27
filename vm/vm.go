@@ -184,6 +184,7 @@ func symbol(token *tokenizer.Token, out *strings.Builder) {
 		">": "gt",
 		"<": "lt",
 		"&": "and",
+		"|": "or",
 		"*": "call Math.multiply 2",
 		"/": "call Math.divide 2",
 	}
