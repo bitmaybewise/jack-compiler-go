@@ -135,6 +135,9 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	if _, ok := is(".")(tk.Current); ok {
 		if _var != nil {
 			termToken.Method = _var
+			nestedToken.Append(
+				&tokenizer.Token{Raw: "var", Type: tokenizer.IDENTIFIER, Kind: "var", Var: _var},
+			)
 		} else {
 			termToken.Constructor = &tokenizer.Var{
 				Type: termToken.Kind,
@@ -630,6 +633,10 @@ func CompileDo(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		subroutineCall.Method = _var
 	} else if startsWithLowercase {
 		subroutineCall.Method = classSymbolTable["this"]
+	}
+
+	if subroutineCall.Method != nil {
+		do.Append(&tokenizer.Token{Kind: "var", Var: subroutineCall.Method})
 	}
 
 	if _, ok := is(".")(tk.Current); ok {

@@ -161,6 +161,7 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 }
 
 var varTypes = map[string]string{
+	"class":  "pointer",
 	"field":  "this",
 	"arg":    "argument",
 	"var":    "local",
@@ -248,12 +249,6 @@ func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
 		return
 	}
 
-	if token.Method.Kind == "class" {
-		out.WriteString(fmt.Sprintf("push pointer %d\n", token.Method.Index))
-	}
-	if token.Method.Kind == "field" {
-		out.WriteString(fmt.Sprintf("push this %d\n", token.Method.Index))
-	}
 	if token.Method.Kind == "var" {
 		out.WriteString(fmt.Sprintf("push local %d\n", token.Method.Index))
 	}
@@ -263,7 +258,7 @@ func subroutineCall(token *tokenizer.Token, out *strings.Builder) {
 }
 
 func returnCall(token *tokenizer.Token, out *strings.Builder) {
-	subroutineType := token.Parent.Parent.Parent.Kind
+	subroutineType := token.Parent.Parent.Parent.Type
 	if subroutineType == "void" {
 		push("constant", 0, out)
 	}
