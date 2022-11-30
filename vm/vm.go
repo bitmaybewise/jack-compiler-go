@@ -42,6 +42,9 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 	case token == nil:
 		return
 
+	case token.Kind == "null":
+		push("constant", 0, out)
+
 	case token.Kind == "function" || token.Kind == "constructor" || token.Kind == "method":
 		function(token, out)
 
@@ -63,7 +66,11 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		return
 
 	case token.Kind == "var" && token.Parent.Kind == "let":
-		if token.ArrayIndex != nil {
+		if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
+			for _, child := range token.ArrayIndex.Children() {
+				translate(child, out)
+			}
+		} else if token.ArrayIndex != nil {
 			out.WriteString("pop temp 0\n")
 			push(varTypes[token.Var.Kind], token.Var.Index, out)
 			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
@@ -76,7 +83,11 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		}
 
 	case token.Kind == "var" && token.Parent.Kind != "let":
-		if token.ArrayIndex != nil {
+		if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
+			for _, child := range token.ArrayIndex.Children() {
+				translate(child, out)
+			}
+		} else if token.ArrayIndex != nil {
 			push(varTypes[token.Var.Kind], token.Var.Index, out)
 			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
 			out.WriteString("add\n")
@@ -161,11 +172,12 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 }
 
 var varTypes = map[string]string{
-	"class":  "pointer",
-	"field":  "this",
-	"arg":    "argument",
-	"var":    "local",
-	"static": "static",
+	"class":    "pointer",
+	"field":    "this",
+	"arg":      "argument",
+	"var":      "local",
+	"static":   "static",
+	"constant": "constant",
 }
 
 func push(dest string, value any, out *strings.Builder) {

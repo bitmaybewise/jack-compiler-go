@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/hlmerscher/jack-compiler-go/logger"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
@@ -168,6 +169,11 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	if termToken.Type == tokenizer.IDENTIFIER {
 		termToken.Var = _var
 		termToken.Kind = "var"
+	}
+
+	if termToken.Type == tokenizer.INT_CONST {
+		idx, _ := strconv.Atoi(termToken.Raw)
+		termToken.Var = &tokenizer.Var{Kind: "constant", Index: idx, Type: string(tokenizer.INT_CONST)}
 	}
 
 	return termToken, nil
@@ -495,15 +501,12 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	termToken.Var = sym
 
 	if _, ok := is("[")(tk.Current); ok {
-		// let.Append(termToken)
-
 		processTokenOrPanics(tk, is("["))
 
 		expToken, err := CompileExpression(tk)
 		if err != nil {
 			return nil, err
 		}
-		// let.Append(expToken)
 		termToken.ArrayIndex = expToken.Children()[0]
 
 		processTokenOrPanics(tk, is("]"))
