@@ -69,13 +69,24 @@ func (tk *Tokenizer) nextToken() Token {
 	var currentIndex int
 	for i, char := range tk.tokenizedLine {
 		currentIndex = i
-		if char == ' ' && tk.tokenizedLine[0] != '"' {
+
+		lineStartsWithQuote := tk.tokenizedLine[0] == '"'
+		symbol := isSymbol(string(char))
+
+		if char == ' ' && !lineStartsWithQuote {
 			break
 		}
-		if isSymbol(string(char)) && rawToken.Len() > 0 {
+		if char == '"' && lineStartsWithQuote && i > 0 {
+			currentIndex++
+			rawToken.WriteRune(char)
 			break
 		}
-		if isSymbol(string(char)) && rawToken.Len() == 0 {
+
+		if symbol && !lineStartsWithQuote && rawToken.Len() > 0 {
+			break
+		}
+
+		if symbol && !lineStartsWithQuote && rawToken.Len() == 0 {
 			currentIndex++
 			rawToken.WriteRune(char)
 			break
