@@ -66,33 +66,68 @@ func translate(token *tokenizer.Token, out *strings.Builder) {
 		return
 
 	case token.Kind == "var" && token.Parent.Kind == "let":
-		if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
-			for _, child := range token.ArrayIndex.Children() {
+		// if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
+		// 	push(varTypes[token.Var.Kind], token.Var.Index, out)
+		// 	for _, child := range token.ArrayIndex.Children() {
+		// 		translate(child, out)
+		// 	}
+		// 	out.WriteString("add\n")
+		// 	out.WriteString("pop pointer 1\n")
+		// 	out.WriteString("pop that 0\n")
+		// } else if token.ArrayIndex != nil {
+		// 	out.WriteString("pop temp 0\n")
+		// 	push(varTypes[token.Var.Kind], token.Var.Index, out)
+		// 	push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
+		// 	out.WriteString("add\n")
+		// 	out.WriteString("pop pointer 1\n")
+		// 	out.WriteString("push temp 0\n")
+		// 	out.WriteString("pop that 0\n")
+		// } else {
+		// 	pop(varTypes[token.Var.Kind], token.Var.Index, out)
+		// }
+
+		if token.Var.Type == "Array" && len(token.Children()) > 0 {
+			push(varTypes[token.Var.Kind], token.Var.Index, out)
+			for _, child := range token.Children() {
 				translate(child, out)
 			}
-		} else if token.ArrayIndex != nil {
-			out.WriteString("pop temp 0\n")
-			push(varTypes[token.Var.Kind], token.Var.Index, out)
-			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
 			out.WriteString("add\n")
 			out.WriteString("pop pointer 1\n")
-			out.WriteString("push temp 0\n")
 			out.WriteString("pop that 0\n")
+			return
 		} else {
 			pop(varTypes[token.Var.Kind], token.Var.Index, out)
 		}
 
 	case token.Kind == "var" && token.Parent.Kind != "let":
-		if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
-			for _, child := range token.ArrayIndex.Children() {
+		// if token.ArrayIndex != nil && token.ArrayIndex.Raw == "term" {
+		// 	push(varTypes[token.Var.Kind], token.Var.Index, out)
+		// 	fmt.Printf("PARENT %s\n", token)
+		// 	for _, child := range token.Children() {
+		// 		fmt.Printf("child %s\n", child)
+		// 		translate(child, out)
+		// 	}
+		// 	out.WriteString("add\n")
+		// 	out.WriteString("pop pointer 1\n")
+		// 	out.WriteString("push that 0\n")
+		// } else if token.ArrayIndex != nil {
+		// 	push(varTypes[token.Var.Kind], token.Var.Index, out)
+		// 	push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
+		// 	out.WriteString("add\n")
+		// 	out.WriteString("pop pointer 1\n")
+		// 	out.WriteString("push that 0\n")
+		// } else {
+		// 	push(varTypes[token.Var.Kind], token.Var.Index, out)
+		// }
+		if token.Var.Type == "Array" && len(token.Children()) > 0 {
+			push(varTypes[token.Var.Kind], token.Var.Index, out)
+			for _, child := range token.Children() {
 				translate(child, out)
 			}
-		} else if token.ArrayIndex != nil {
-			push(varTypes[token.Var.Kind], token.Var.Index, out)
-			push(varTypes[token.ArrayIndex.Var.Kind], token.ArrayIndex.Var.Index, out)
 			out.WriteString("add\n")
 			out.WriteString("pop pointer 1\n")
 			out.WriteString("push that 0\n")
+			return
 		} else {
 			push(varTypes[token.Var.Kind], token.Var.Index, out)
 		}

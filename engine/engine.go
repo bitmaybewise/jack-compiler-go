@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 
 	"github.com/hlmerscher/jack-compiler-go/logger"
 	"github.com/hlmerscher/jack-compiler-go/tokenizer"
@@ -121,8 +120,11 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		if err != nil {
 			return nil, err
 		}
-		arrayIndex := expToken.Children()[0]
-		termToken.ArrayIndex = arrayIndex
+		// arrayIndex := expToken.Children()[0]
+		// termToken.ArrayIndex = arrayIndex
+		for _, child := range expToken.Children() {
+			termToken.Append(child)
+		}
 		termToken.Var = _var
 		termToken.Kind = _var.Kind
 		nestedToken.Append(termToken)
@@ -172,8 +174,9 @@ func CompileTerm(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 	}
 
 	if termToken.Type == tokenizer.INT_CONST {
-		idx, _ := strconv.Atoi(termToken.Raw)
-		termToken.Var = &tokenizer.Var{Kind: "constant", Index: idx, Type: string(tokenizer.INT_CONST)}
+		termToken.Kind = string(tokenizer.INT_CONST)
+		// idx, _ := strconv.Atoi(termToken.Raw)
+		// termToken.Var = &tokenizer.Var{Kind: "constant", Index: idx, Type: termToken.Kind}
 	}
 
 	return termToken, nil
@@ -230,19 +233,15 @@ func CompileClassVarDec(tk *tokenizer.Tokenizer, nvars *int) (*tokenizer.Token, 
 func CompileVarDec(tk *tokenizer.Tokenizer, nvars *int) (*tokenizer.Token, error) {
 	nestedToken := &tokenizer.Token{Raw: "varDec", Kind: "varDec"}
 
-	// varDecToken, err := processToken(tk, is("var"))
 	_, err := processToken(tk, is("var"))
 	if err != nil {
 		return nil, err
 	}
-	// varDecToken.Kind = "varDec"
-	// nestedToken.Append(varDecToken)
 
 	typeToken, err := processToken(tk, isType())
 	if err != nil {
 		return nil, err
 	}
-	// nestedToken.Append(typeToken)
 
 	for {
 		varNameToken, err := processToken(tk, isIdentifier())
@@ -507,7 +506,10 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 		if err != nil {
 			return nil, err
 		}
-		termToken.ArrayIndex = expToken.Children()[0]
+		// termToken.ArrayIndex = expToken.Children()[0]
+		for _, child := range expToken.Children() {
+			termToken.Append(child)
+		}
 
 		processTokenOrPanics(tk, is("]"))
 	}
