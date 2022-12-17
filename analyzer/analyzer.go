@@ -17,12 +17,19 @@ func Compile(file *os.File, out *strings.Builder) error {
 		return err
 	}
 
-	compiled, err := engine.CompileClass(&tk)
-	if err != nil {
+	vmBuf := vm.New(out)
+	compiler := engine.New(vmBuf)
+
+	if err := compiler.Class(&tk); err != nil {
 		return err
 	}
 
-	vm.Output(compiled, out)
+	// compiled, err := engine.CompileClass(&tk)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// vm.Output(compiled, out)
 
 	return nil
 }
