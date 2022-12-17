@@ -525,6 +525,7 @@ func CompileLet(tk *tokenizer.Tokenizer) (*tokenizer.Token, error) {
 
 func enforceVarDec(tk *tokenizer.Tokenizer, termToken *tokenizer.Token) (*tokenizer.Var, error) {
 	subroutineSymbol, inSubroutineDec := subroutineSymbolTable[termToken.Raw]
+	fmt.Println(subroutineSymbol)
 	classSymbol, inClassDec := classSymbolTable[termToken.Raw]
 	found := inSubroutineDec || inClassDec
 	// the jack compiler performs no linking, so if the term starts with a uppercased letter,
