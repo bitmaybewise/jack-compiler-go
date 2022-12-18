@@ -432,6 +432,17 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 	if termToken.Type == tokenizer.INT_CONST {
 		c.vmw.WritePush("constant", termToken.Raw)
 	}
+	if termToken.Type == tokenizer.STRING_CONST {
+		c.vmw.WritePush("constant", len(termToken.Raw)-2)
+		c.vmw.WriteCall("String", "new", 1)
+		for _, char := range termToken.Raw {
+			if char == '"' {
+				continue
+			}
+			c.vmw.WritePush("constant", char)
+			c.vmw.WriteCall("String", "appendChar", 2) // 2 because 1 is the string ref, 1 is the char
+		}
+	}
 	if termToken.Type != tokenizer.KEYWORD {
 		return nil
 	}
