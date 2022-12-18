@@ -291,12 +291,35 @@ func (c *Compiler) Let(tk *tokenizer.Tokenizer) error {
 		return err
 	}
 
-	processTokenOrPanics(tk, is("="))
-	err = c.Expression(tk)
-	if err != nil {
-		return err
+	if _, ok := is("[")(tk.Current); ok {
+		c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
+
+		processTokenOrPanics(tk, is("["))
+		if err := c.Expression(tk); err != nil {
+			return err
+		}
+		processTokenOrPanics(tk, is("]"))
+
+		c.vmw.WriteArithmetic("+")
+
+		processTokenOrPanics(tk, is("="))
+		if err = c.Expression(tk); err != nil {
+			return err
+		}
+
+		c.vmw.WritePop("temp", 0)
+		c.vmw.WritePop("pointer", 1)
+		c.vmw.WritePush("temp", 0)
+		c.vmw.WritePop("that", 0)
+
+	} else {
+		processTokenOrPanics(tk, is("="))
+		if err = c.Expression(tk); err != nil {
+			return err
+		}
+		c.vmw.WritePop(vm.VarTypes[_var.Kind], _var.Index)
 	}
-	c.vmw.WritePop(vm.VarTypes[_var.Kind], _var.Index)
+
 	processTokenOrPanics(tk, is(";"))
 
 	return nil
@@ -403,6 +426,23 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 	_var, err := c.enforceVarDec(tk, termToken)
 	if err != nil {
 		return err
+	}
+
+	// [expression]
+	if _, ok := is("[")(tk.Current); ok {
+		c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
+
+		processTokenOrPanics(tk, is("["))
+		if err := c.Expression(tk); err != nil {
+			return err
+		}
+		processTokenOrPanics(tk, is("]"))
+
+		c.vmw.WriteArithmetic("+")
+		c.vmw.WritePop("pointer", 1)
+		c.vmw.WritePush("that", 0)
+
+		return nil
 	}
 
 	// subroutineCall
