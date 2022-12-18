@@ -39,7 +39,7 @@ func Error(err error) {
 	Errorf("", err)
 }
 
-func Errorf(msg string, err error) {
+func Errorf(msg string, err any) {
 	if err != nil {
 		log.Fatalf("\n%s%s", msg, err)
 	}

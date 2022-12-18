@@ -18,29 +18,75 @@ type Compiler struct {
 }
 
 func (c *Compiler) Class(tk *tokenizer.Tokenizer) error {
+	c.classSymbolTable = make(map[string]*tokenizer.Var)
+
 	processTokenOrPanics(tk, is("class"))
 	classNameToken := processTokenOrPanics(tk, isIdentifier())
-	processTokenOrPanics(tk, is("{"))
+	c.classSymbolTable["this"] = &tokenizer.Var{
+		Index: 0,
+		Type:  classNameToken.Raw,
+		Kind:  "class",
+	}
 
+	processTokenOrPanics(tk, is("{"))
+	var nvars int
 	for {
-		err := c.Subroutine(tk, classNameToken)
+		err := c.ClassVarDec(tk, &nvars)
+		if errors.Is(err, notClassVarDec) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	for {
+		err := c.Subroutine(tk, classNameToken, nvars)
 		if errors.Is(err, notSubroutineDec) {
 			break
 		}
 		logger.Error(err)
 	}
-
 	processTokenOrPanics(tk, is("}"))
+
 	return nil
 }
 
-func (c *Compiler) Subroutine(tk *tokenizer.Tokenizer, classToken *tokenizer.Token) error {
+func (c *Compiler) ClassVarDec(tk *tokenizer.Tokenizer, nvars *int) error {
+	matcher := or(is("static"), is("field"))
+	if _, ok := matcher(tk.Current); !ok {
+		return notClassVarDec
+	}
+
+	classVarDecToken := processTokenOrPanics(tk, matcher)
+	typeToken := processTokenOrPanics(tk, isType())
+
+	for i := 0; ; i++ {
+		varNameToken := processTokenOrPanics(tk, isIdentifier())
+		c.classSymbolTable[varNameToken.Raw] = &tokenizer.Var{
+			Type:  typeToken.Raw,
+			Kind:  classVarDecToken.Raw,
+			Index: *nvars,
+		}
+		*nvars++
+
+		if _, err := processToken(tk, is(",")); err != nil {
+			break
+		}
+	}
+	processTokenOrPanics(tk, is(";"))
+
+	return nil
+}
+
+func (c *Compiler) Subroutine(tk *tokenizer.Tokenizer, classToken *tokenizer.Token, nClassVars int) error {
 	c.subroutineSymbolTable = make(map[string]*tokenizer.Var)
 
 	matcher := or(is("constructor"), is("function"), is("method"))
 	if _, ok := matcher(tk.Current); !ok {
 		return notSubroutineDec
 	}
+	_, isConstructor := is("constructor")(tk.Current)
+	_, isMethod := is("method")(tk.Current)
 	processTokenOrPanics(tk, matcher)
 
 	typeToken := processTokenOrPanics(tk, is("void"), isType())
@@ -48,10 +94,26 @@ func (c *Compiler) Subroutine(tk *tokenizer.Tokenizer, classToken *tokenizer.Tok
 
 	processTokenOrPanics(tk, is("("))
 	var args int
+	if isMethod {
+		args++
+	}
 	c.ParameterList(tk, &args)
 	processTokenOrPanics(tk, is(")"))
 
-	err := c.SubroutineBody(tk, classToken, nameToken, typeToken)
+	writeSubroutine := func(nLocalVars int) {
+		c.vmw.WriteSubroutine(classToken.Raw, nameToken.Raw, nLocalVars)
+		if isConstructor {
+			c.vmw.WritePush("constant", nClassVars)
+			c.vmw.WriteCall("Memory", "alloc", 1)
+			c.vmw.WritePop("pointer", 0)
+		}
+		if isMethod {
+			c.vmw.WritePush("argument", 0)
+			c.vmw.WritePop("pointer", 0)
+		}
+	}
+
+	err := c.SubroutineBody(tk, typeToken, writeSubroutine)
 	if err != nil {
 		return err
 	}
@@ -59,7 +121,7 @@ func (c *Compiler) Subroutine(tk *tokenizer.Tokenizer, classToken *tokenizer.Tok
 	return nil
 }
 
-func (c *Compiler) SubroutineBody(tk *tokenizer.Tokenizer, className, subroutineName, subroutineType *tokenizer.Token) error {
+func (c *Compiler) SubroutineBody(tk *tokenizer.Tokenizer, subroutineType *tokenizer.Token, writeSubroutine func(int)) error {
 	processTokenOrPanics(tk, is("{"))
 
 	var nvars int
@@ -72,10 +134,9 @@ func (c *Compiler) SubroutineBody(tk *tokenizer.Tokenizer, className, subroutine
 			return err
 		}
 	}
+	writeSubroutine(nvars)
 
-	c.vmw.WriteSubroutine(className.Raw, subroutineName.Raw, nvars)
-
-	c.Statements(tk, nvars, subroutineType)
+	c.Statements(tk, subroutineType)
 	processTokenOrPanics(tk, is("}"))
 
 	return nil
@@ -107,7 +168,7 @@ func (c *Compiler) VarDec(tk *tokenizer.Tokenizer, nvars *int) error {
 	return nil
 }
 
-func (c *Compiler) Statements(tk *tokenizer.Tokenizer, nvars int, subroutineType *tokenizer.Token) error {
+func (c *Compiler) Statements(tk *tokenizer.Tokenizer, subroutineType *tokenizer.Token) error {
 	for {
 		if _, ok := is("let")(tk.Current); ok {
 			if err := c.Let(tk); err != nil {
@@ -128,7 +189,7 @@ func (c *Compiler) Statements(tk *tokenizer.Tokenizer, nvars int, subroutineType
 			continue
 		}
 		if _, ok := is("do")(tk.Current); ok {
-			if err := c.Do(tk, nvars); err != nil {
+			if err := c.Do(tk); err != nil {
 				return err
 			}
 			continue
@@ -160,7 +221,7 @@ func (c *Compiler) While(tk *tokenizer.Tokenizer) error {
 		},
 		func() error {
 			processTokenOrPanics(tk, is("{"))
-			if err := c.Statements(tk, 0, nil); err != nil {
+			if err := c.Statements(tk, nil); err != nil {
 				return err
 			}
 			processTokenOrPanics(tk, is("}"))
@@ -183,7 +244,7 @@ func (c *Compiler) If(tk *tokenizer.Tokenizer) error {
 
 	c.vmw.WriteIf(
 		func() error {
-			if err := c.Statements(tk, 0, nil); err != nil {
+			if err := c.Statements(tk, nil); err != nil {
 				return err
 			}
 			processTokenOrPanics(tk, is("}"))
@@ -197,7 +258,7 @@ func (c *Compiler) If(tk *tokenizer.Tokenizer) error {
 			}
 			processTokenOrPanics(tk, is("else"))
 			processTokenOrPanics(tk, is("{"))
-			if err := c.Statements(tk, 0, nil); err != nil {
+			if err := c.Statements(tk, nil); err != nil {
 				return err
 			}
 			processTokenOrPanics(tk, is("}"))
@@ -209,25 +270,13 @@ func (c *Compiler) If(tk *tokenizer.Tokenizer) error {
 	return nil
 }
 
-func (c *Compiler) Do(tk *tokenizer.Tokenizer, nvars int) error {
-	var varClassNameToken, subroutineNameToken *tokenizer.Token
-
+func (c *Compiler) Do(tk *tokenizer.Tokenizer) error {
 	processTokenOrPanics(tk, is("do"))
-	varClassNameToken = processTokenOrPanics(tk, isIdentifier())
-
-	if _, ok := is(".")(tk.Current); ok {
-		processTokenOrPanics(tk, is("."))
-		subroutineNameToken = processTokenOrPanics(tk, isIdentifier())
-	}
-
-	processTokenOrPanics(tk, is("("))
-	n, err := c.ExpressionList(tk)
-	if err != nil {
+	if err := c.Expression(tk); err != nil {
 		return err
 	}
-	processTokenOrPanics(tk, is(")"))
 	processTokenOrPanics(tk, is(";"))
-	c.vmw.WriteCall(varClassNameToken.Raw, subroutineNameToken.Raw, n)
+
 	c.vmw.WritePop("temp", 0)
 
 	return nil
@@ -280,12 +329,11 @@ func (c *Compiler) ExpressionList(tk *tokenizer.Tokenizer) (int, error) {
 }
 
 func (c *Compiler) Expression(tk *tokenizer.Tokenizer) error {
-	if _, ok := is(";")(tk.Current); ok {
+	if _, ok := or(is(";"), is(")"))(tk.Current); ok {
 		return notExpressionDec
 	}
 
-	err := c.Term(tk)
-	if err != nil {
+	if err := c.Term(tk); err != nil {
 		return err
 	}
 
@@ -330,8 +378,28 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 		return nil
 	}
 
-	// varName
+	// varName / methodName
 	termToken := processTokenOrPanics(tk, isTerm())
+
+	// (method call)
+	if _, ok := is("(")(tk.Current); ok {
+		processTokenOrPanics(tk, is("("))
+		n, err := c.ExpressionList(tk)
+		if err != nil && !errors.Is(err, notExpressionDec) {
+			return err
+		}
+		processTokenOrPanics(tk, is(")"))
+
+		_var, ok := c.classSymbolTable["this"]
+		if !ok {
+			logger.Errorf("not a method call: %q\n", termToken.Raw)
+		}
+		c.vmw.WritePush("pointer", 0)
+		c.vmw.WriteCall(_var.Type, termToken.Raw, n+1) // +1, given this is pushed to the stack
+
+		return nil
+	}
+
 	_var, err := c.enforceVarDec(tk, termToken)
 	if err != nil {
 		return err
@@ -347,7 +415,13 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 			return err
 		}
 		processTokenOrPanics(tk, is(")"))
-		c.vmw.WriteCall(termToken.Raw, subroutineNameToken.Raw, n)
+
+		if _var != nil {
+			c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
+			c.vmw.WriteCall(_var.Type, subroutineNameToken.Raw, n+1) // method call, previous push instruction is pushing obj to the stack
+		} else {
+			c.vmw.WriteCall(termToken.Raw, subroutineNameToken.Raw, n)
+		}
 
 		return nil
 	}
@@ -358,8 +432,13 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 	if termToken.Type == tokenizer.INT_CONST {
 		c.vmw.WritePush("constant", termToken.Raw)
 	}
-	if termToken.Type == tokenizer.KEYWORD {
+	if termToken.Type != tokenizer.KEYWORD {
+		return nil
+	}
+	if _var == nil {
 		c.vmw.WriteKeyword(termToken.Raw)
+	} else {
+		c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
 	}
 
 	return nil
@@ -429,7 +508,6 @@ func (c *Compiler) enforceVarDec(tk *tokenizer.Tokenizer, termToken *tokenizer.T
 
 func New(buf *vm.Writer) Compiler {
 	return Compiler{
-		vmw:                   buf,
-		subroutineSymbolTable: make(map[string]*tokenizer.Var),
+		vmw: buf,
 	}
 }
