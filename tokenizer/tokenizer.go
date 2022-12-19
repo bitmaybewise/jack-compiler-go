@@ -2,7 +2,6 @@ package tokenizer
 
 import (
 	"bufio"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -98,7 +97,6 @@ func (tk *Tokenizer) nextToken() Token {
 	tk.Current = Token{
 		Raw:  rawToken.String(),
 		Type: parseTokenType(rawToken.String()),
-		Kind: rawToken.String(),
 	}
 
 	return tk.Current
@@ -192,86 +190,10 @@ func (v *Var) String() string {
 type Token struct {
 	Raw  string
 	Type TokenType
-
-	// nested token
-	Kind     string
-	Parent   *Token
-	children []*Token
-	NFields  int
-
-	Var         *Var
-	Method      *Var
-	Constructor *Var
-	ArrayIndex  *Token
 }
 
 func (t *Token) String() string {
-	var s []string
-	s = []string{fmt.Sprintf("%s:%s", t.Type, t.Raw)}
-
-	if t.Kind != "" {
-		s = append(s, fmt.Sprintf("kind:%s", t.Kind))
-	}
-	if t.Var != nil {
-		s = append(s, fmt.Sprintf("var:%s", t.Var))
-	}
-	if t.Method != nil {
-		s = append(s, fmt.Sprintf("method:%s", t.Method))
-	}
-	if t.Constructor != nil {
-		s = append(s, fmt.Sprintf("constructor:%s", t.Constructor))
-	}
-	if t.Kind == "class" {
-		s = append(s, fmt.Sprintf("nFields:%d", t.NFields))
-	}
-	if t.ArrayIndex != nil {
-		s = append(s, fmt.Sprintf("array: %s", t.ArrayIndex))
-	}
-
-	return fmt.Sprintf("(%s)", strings.Join(s, " "))
-}
-
-func (nt *Token) Append(token *Token) {
-	if token == nil {
-		return
-	}
-
-	nt.children = append(nt.children, token)
-	token.Parent = nt
-}
-
-func (nt *Token) Children() []*Token {
-	return nt.children
-}
-
-func (t *Token) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	start.Name.Local = string(t.Type)
-	value := strings.Trim(t.Raw, "\"")
-	value = strings.Trim(value, "\n")
-	value = strings.Trim(value, "\r")
-	err := e.EncodeElement(fmt.Sprintf(" %s ", value), start)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (t *Token) NLocalVars() int {
-	var count int
-	for _, child := range t.Children() {
-		if child.Kind == "varDec" {
-			count += len(child.Children())
-		}
-		count += child.NLocalVars()
-	}
-	return count
-}
-
-func (t *Token) NStackVars() int {
-	if len(t.Parent.children) == 0 {
-		return 0
-	}
-	return len(t.Parent.children) - 1
+	return fmt.Sprintf("%s:%s", t.Type, t.Raw)
 }
 
 func parseTokenType(value string) TokenType {
