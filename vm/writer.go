@@ -19,9 +19,29 @@ var arithmeticOpsTable = map[string]string{
 	"/": "call Math.divide 2",
 }
 
+func ArithmeticOps() []string {
+	ops := make([]string, len(arithmeticOpsTable))
+	i := 0
+	for op := range arithmeticOpsTable {
+		ops[i] = op
+		i++
+	}
+	return ops
+}
+
 var unaryOpsTable = map[string]string{
 	"-": "neg",
 	"~": "not",
+}
+
+func UnaryOps() []string {
+	ops := make([]string, len(unaryOpsTable))
+	i := 0
+	for op := range unaryOpsTable {
+		ops[i] = op
+		i++
+	}
+	return ops
 }
 
 var VarTypes = map[string]string{
