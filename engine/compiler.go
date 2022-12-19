@@ -401,11 +401,14 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 		return nil
 	}
 
-	// varName / methodName
+	// varName / subroutineName
 	termToken := processTokenOrPanics(tk, isTerm())
 
 	// (method call)
 	if _, ok := is("(")(tk.Current); ok {
+		_var := c.classSymbolTable["this"] // this will always be present here
+		c.vmw.WritePush("pointer", 0)
+
 		processTokenOrPanics(tk, is("("))
 		n, err := c.ExpressionList(tk)
 		if err != nil && !errors.Is(err, notExpressionDec) {
@@ -413,11 +416,6 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 		}
 		processTokenOrPanics(tk, is(")"))
 
-		_var, ok := c.classSymbolTable["this"]
-		if !ok {
-			logger.Errorf("not a method call: %q\n", termToken.Raw)
-		}
-		c.vmw.WritePush("pointer", 0)
 		c.vmw.WriteCall(_var.Type, termToken.Raw, n+1) // +1, given this is pushed to the stack
 
 		return nil
@@ -447,6 +445,12 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 
 	// subroutineCall
 	if _, ok := is(".")(tk.Current); ok {
+		caller := termToken.Raw
+		if _var != nil {
+			c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
+			caller = _var.Type
+		}
+
 		processTokenOrPanics(tk, is("."))
 		subroutineNameToken := processTokenOrPanics(tk, isIdentifier())
 		processTokenOrPanics(tk, is("("))
@@ -457,11 +461,10 @@ func (c *Compiler) Term(tk *tokenizer.Tokenizer) error {
 		processTokenOrPanics(tk, is(")"))
 
 		if _var != nil {
-			c.vmw.WritePush(vm.VarTypes[_var.Kind], _var.Index)
-			c.vmw.WriteCall(_var.Type, subroutineNameToken.Raw, n+1) // method call, previous push instruction is pushing obj to the stack
-		} else {
-			c.vmw.WriteCall(termToken.Raw, subroutineNameToken.Raw, n)
+			// when is a method call, previous push instruction is pushing the this obj to the stack
+			n++
 		}
+		c.vmw.WriteCall(caller, subroutineNameToken.Raw, n)
 
 		return nil
 	}

@@ -33,11 +33,13 @@ var VarTypes = map[string]string{
 	"constant": "constant",
 }
 
-type Writer struct {
-	out *strings.Builder
-
+var (
 	ifCounter    int
 	whileCounter int
+)
+
+type Writer struct {
+	out *strings.Builder
 }
 
 func (w *Writer) Output() string {
@@ -75,7 +77,7 @@ func (w *Writer) WriteKeyword(keyword string) error {
 		_, err = w.out.WriteString("not\n")
 		return err
 	}
-	if keyword == "false" {
+	if keyword == "false" || keyword == "null" {
 		_, err := w.out.WriteString("push constant 0\n")
 		return err
 	}
@@ -123,11 +125,11 @@ func (w *Writer) WriteCall(subroutineType, subroutineName string, nStackVars int
 }
 
 func (w *Writer) WriteWhile(expressionFn func() error, statementsFn func() error) error {
-	t := fmt.Sprintf("WHILE_EXP_%d", w.whileCounter)
-	f := fmt.Sprintf("WHILE_END_%d", w.whileCounter)
+	t := fmt.Sprintf("WHILE_EXP_%d", whileCounter)
+	f := fmt.Sprintf("WHILE_END_%d", whileCounter)
 	labelT := fmt.Sprintf("label %s\n", t)
 	labelF := fmt.Sprintf("label %s\n", f)
-	w.whileCounter++
+	whileCounter++
 
 	w.out.WriteString(labelT)
 	if err := expressionFn(); err != nil { // compiled expression
@@ -145,11 +147,11 @@ func (w *Writer) WriteWhile(expressionFn func() error, statementsFn func() error
 }
 
 func (w *Writer) WriteIf(ifFn func() error, elseFn func() error) error {
-	ifFalse := fmt.Sprintf("IF_%d", w.ifCounter)
-	ifEnd := fmt.Sprintf("IF_END_%d", w.ifCounter)
+	ifFalse := fmt.Sprintf("IF_%d", ifCounter)
+	ifEnd := fmt.Sprintf("IF_END_%d", ifCounter)
 	labelFalse := fmt.Sprintf("label %s\n", ifFalse)
 	labelEnd := fmt.Sprintf("label %s\n", ifEnd)
-	w.ifCounter++
+	ifCounter++
 
 	w.out.WriteString("not\n")
 	w.out.WriteString(fmt.Sprintf("if-goto %s\n", ifFalse))

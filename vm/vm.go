@@ -316,8 +316,6 @@ func this(token *tokenizer.Token, out *strings.Builder) {
 	out.WriteString("push pointer 0\n")
 }
 
-var whileCounter = 0
-
 func while(token *tokenizer.Token, expressionFn, statementsFn func(), out *strings.Builder) {
 	t := fmt.Sprintf("WHILE_EXP_%d", whileCounter)
 	f := fmt.Sprintf("WHILE_END_%d", whileCounter)
@@ -333,8 +331,6 @@ func while(token *tokenizer.Token, expressionFn, statementsFn func(), out *strin
 	out.WriteString(fmt.Sprintf("goto %s\n", t))
 	out.WriteString(labelF)
 }
-
-var ifCounter = 0
 
 func ifStatement(token *tokenizer.Token, ifFn, elseFn func(), out *strings.Builder) {
 	ifFalse := fmt.Sprintf("IF_%d", ifCounter)
