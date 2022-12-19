@@ -11,25 +11,15 @@ import (
 
 func Compile(file *os.File, out *strings.Builder) error {
 	tk := tokenizer.New(file)
-
-	_, err := tk.Advance()
-	if err != nil {
+	if _, err := tk.Advance(); err != nil {
 		return err
 	}
 
 	vmBuf := vm.New(out)
 	compiler := engine.New(vmBuf)
-
 	if err := compiler.Class(&tk); err != nil {
 		return err
 	}
-
-	// compiled, err := engine.CompileClass(&tk)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// vm.Output(compiled, out)
 
 	return nil
 }
